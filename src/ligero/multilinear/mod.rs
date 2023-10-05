@@ -2,6 +2,7 @@ use ark_crypto_primitives::{merkle_tree::Config, sponge::CryptographicSponge};
 use ark_ff::PrimeField;
 use ark_poly::{MultilinearExtension, Polynomial};
 use ark_std::borrow::Borrow;
+use ark_std::log2;
 use ark_std::marker::PhantomData;
 use ark_std::vec::Vec;
 
@@ -61,8 +62,9 @@ where
         println!("left: {}", left_len);
         println!("right: {}", right_len);
 
-        let left = &point[..left_len];
-        let right = &point[left_len..];
+        let split = log2(left_len) as usize;
+        let left = &point[..split];
+        let right = &point[split..];
         (tensor_inner(left), tensor_inner(right))
     }
 }

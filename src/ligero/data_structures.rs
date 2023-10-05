@@ -46,7 +46,7 @@ where
         let mut coeffs = Self::poly_repr(polynomial);
 
         // 1. Computing parameters and initial matrix
-        let (n_rows, n_cols) = compute_dimensions::<F>(polynomial.degree() + 1); // for 6 coefficients, this is returning 4 x 2 with a row of 0s: fix
+        let (n_rows, n_cols) = compute_dimensions::<F>(coeffs.len()); // for 6 coefficients, this is returning 4 x 2 with a row of 0s: fix
 
         // padding the coefficient vector with zeroes
         // TODO is this the most efficient/safest way to do it?

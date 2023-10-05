@@ -21,15 +21,14 @@ mod utils;
 mod multilinear;
 mod univariate;
 
-pub use univariate::UnivariateLigero;
 pub use multilinear::MultilinearLigero;
+pub use univariate::UnivariateLigero;
 
 mod data_structures;
 use data_structures::*;
 
 pub use data_structures::{
-    LigeroPCCommitterKey, LigeroPCProof, LigeroPCUniversalParams, LigeroPCVerifierKey,
-    LinearEncode,
+    LigeroPCCommitterKey, LigeroPCProof, LigeroPCUniversalParams, LigeroPCVerifierKey, LinearEncode,
 };
 
 use utils::{calculate_t, get_indices_from_transcript, hash_column};
