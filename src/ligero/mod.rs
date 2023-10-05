@@ -80,71 +80,6 @@ where
         (mat, ext_mat)
     }
 
-    /// TODO docs
-    fn create_merkle_tree(
-        ext_mat: &Matrix<F>,
-        leaf_hash_params: &<<C as Config>::LeafHash as CRHScheme>::Parameters,
-        two_to_one_params: &<<C as Config>::TwoToOneHash as TwoToOneCRHScheme>::Parameters,
-    ) -> MerkleTree<C> {
-        let mut col_hashes: Vec<Vec<u8>> = Vec::new();
-        let ext_mat_cols = ext_mat.cols();
-
-        for col in ext_mat_cols.iter() {
-            col_hashes.push(hash_column::<D, F>(col));
-        }
-
-        // pad the column hashes with zeroes
-        let next_pow_of_two = col_hashes.len().next_power_of_two();
-        col_hashes.resize(next_pow_of_two, vec![0; <D as Digest>::output_size()]);
-
-        MerkleTree::<C>::new(leaf_hash_params, two_to_one_params, col_hashes).unwrap()
-    }
-
-    /// Missing docs
-    fn generate_proof(
-        sec_param: usize,
-        rho_inv: usize,
-        b: &[F],
-        mat: &Matrix<F>,
-        ext_mat: &Matrix<F>,
-        col_tree: &MerkleTree<C>,
-        transcript: &mut IOPTranscript<F>,
-    ) -> Result<LigeroPCProofSingle<F, C>, Error> {
-        let t = calculate_t::<F>(sec_param, rho_inv, ext_mat.n)?;
-
-        // 1. left-multiply the matrix by `b`, where for a requested query point `z`,
-        // `b = [1, z^m, z^(2m), ..., z^((m-1)m)]`
-        let v = mat.row_mul(b);
-
-        transcript
-            .append_serializable_element(b"v", &v)
-            .map_err(|_| Error::TranscriptError)?;
-
-        // 2. Generate t column indices to test the linear combination on
-        let indices = get_indices_from_transcript(ext_mat.m, t, transcript)?;
-
-        // 3. Compute Merkle tree paths for the requested columns
-        let mut queried_columns = Vec::with_capacity(t);
-        let mut paths = Vec::with_capacity(t);
-
-        let ext_mat_cols = ext_mat.cols();
-
-        for i in indices {
-            queried_columns.push(ext_mat_cols[i].clone());
-            paths.push(
-                col_tree
-                    .generate_proof(i)
-                    .map_err(|_| Error::TranscriptError)?,
-            );
-        }
-
-        Ok(LigeroPCProofSingle {
-            paths,
-            v,
-            columns: queried_columns,
-        })
-    }
-
     /// Tensor the point
     fn tensor(point: &P::Point, left_len: usize, right_len: usize) -> (Vec<F>, Vec<F>);
 }
@@ -266,8 +201,11 @@ where
             let (mat, ext_mat) = L::compute_matrices(polynomial, ck.rho_inv);
 
             // 2. Create the Merkle tree from the hashes of each column.
-            let col_tree =
-                L::create_merkle_tree(&ext_mat, &ck.leaf_hash_params, &ck.two_to_one_params);
+            let col_tree = create_merkle_tree::<F, C, D>(
+                &ext_mat,
+                &ck.leaf_hash_params,
+                &ck.two_to_one_params,
+            );
 
             // 3. Obtain the MT root and add it to the transcript.
             let root = col_tree.root();
@@ -342,8 +280,11 @@ where
             let (mat, ext_mat) = L::compute_matrices(polynomial, ck.rho_inv);
 
             // 2. Create the Merkle tree from the hashes of each column.
-            let col_tree =
-                L::create_merkle_tree(&ext_mat, &ck.leaf_hash_params, &ck.two_to_one_params);
+            let col_tree = create_merkle_tree::<F, C, D>(
+                &ext_mat,
+                &ck.leaf_hash_params,
+                &ck.two_to_one_params,
+            );
 
             // 3. Generate vector `b = [1, z^m, z^(2m), ..., z^((m-1)m)]`
             // This could potentially fail when n_cols > 1<<64, but `ck` won't allow commiting to such polynomials.
@@ -384,7 +325,7 @@ where
 
             proof_array.push(LigeroPCProof {
                 // compute the opening proof and append b.M to the transcript
-                opening: L::generate_proof(
+                opening: generate_proof(
                     ck.sec_param,
                     ck.rho_inv,
                     &b,
@@ -557,4 +498,79 @@ where
 
         Ok(true)
     }
+}
+
+// TODO maybe this can go to utils
+fn create_merkle_tree<F, C, D>(
+    ext_mat: &Matrix<F>,
+    leaf_hash_params: &<<C as Config>::LeafHash as CRHScheme>::Parameters,
+    two_to_one_params: &<<C as Config>::TwoToOneHash as TwoToOneCRHScheme>::Parameters,
+) -> MerkleTree<C>
+where
+    F: PrimeField,
+    C: Config,
+    Vec<u8>: Borrow<C::Leaf>,
+    D: Digest,
+{
+    let mut col_hashes: Vec<Vec<u8>> = Vec::new();
+    let ext_mat_cols = ext_mat.cols();
+
+    for col in ext_mat_cols.iter() {
+        col_hashes.push(hash_column::<D, F>(col));
+    }
+
+    // pad the column hashes with zeroes
+    let next_pow_of_two = col_hashes.len().next_power_of_two();
+    col_hashes.resize(next_pow_of_two, vec![0; <D as Digest>::output_size()]);
+
+    MerkleTree::<C>::new(leaf_hash_params, two_to_one_params, col_hashes).unwrap()
+}
+
+fn generate_proof<F, C>(
+    sec_param: usize,
+    rho_inv: usize,
+    b: &[F],
+    mat: &Matrix<F>,
+    ext_mat: &Matrix<F>,
+    col_tree: &MerkleTree<C>,
+    transcript: &mut IOPTranscript<F>,
+) -> Result<LigeroPCProofSingle<F, C>, Error>
+where
+    F: PrimeField,
+    C: Config,
+    Vec<u8>: Borrow<C::Leaf>,
+{
+    let t = calculate_t::<F>(sec_param, rho_inv, ext_mat.n)?;
+
+    // 1. left-multiply the matrix by `b`, where for a requested query point `z`,
+    // `b = [1, z^m, z^(2m), ..., z^((m-1)m)]`
+    let v = mat.row_mul(b);
+
+    transcript
+        .append_serializable_element(b"v", &v)
+        .map_err(|_| Error::TranscriptError)?;
+
+    // 2. Generate t column indices to test the linear combination on
+    let indices = get_indices_from_transcript(ext_mat.m, t, transcript)?;
+
+    // 3. Compute Merkle tree paths for the requested columns
+    let mut queried_columns = Vec::with_capacity(t);
+    let mut paths = Vec::with_capacity(t);
+
+    let ext_mat_cols = ext_mat.cols();
+
+    for i in indices {
+        queried_columns.push(ext_mat_cols[i].clone());
+        paths.push(
+            col_tree
+                .generate_proof(i)
+                .map_err(|_| Error::TranscriptError)?,
+        );
+    }
+
+    Ok(LigeroPCProofSingle {
+        paths,
+        v,
+        columns: queried_columns,
+    })
 }

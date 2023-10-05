@@ -247,7 +247,7 @@ impl PCRandomness for LigeroPCRandomness {
 /// Proof of an individual Ligero well-formedness check or opening
 #[derive(Derivative, CanonicalSerialize, CanonicalDeserialize)]
 #[derivative(Default(bound = ""), Clone(bound = ""), Debug(bound = ""))]
-pub struct LigeroPCProofSingle<F, C>
+pub(crate) struct LigeroPCProofSingle<F, C>
 where
     F: PrimeField,
     C: Config,
