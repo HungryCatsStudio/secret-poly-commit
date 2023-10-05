@@ -136,7 +136,7 @@ where
 /// Note: The scheme currently does not support hiding.
 ///
 /// [ligero]: https://eprint.iacr.org/2022/1608.pdf
-pub struct Ligero<
+pub struct UnivariateLigero<
     F: PrimeField,
     C: Config,
     D: Digest,
@@ -146,7 +146,7 @@ pub struct Ligero<
     _phantom: PhantomData<(F, C, D, S, P)>,
 }
 
-impl<F, C, D, S, P> LinearEncode<F, P, C, D> for Ligero<F, C, D, S, P>
+impl<F, C, D, S, P> LinearEncode<F, P, C, D> for UnivariateLigero<F, C, D, S, P>
 where
     F: PrimeField,
     C: Config,

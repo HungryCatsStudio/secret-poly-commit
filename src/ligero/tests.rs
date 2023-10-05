@@ -5,7 +5,7 @@ mod tests {
     use crate::ligero::LinearCodePCS;
     use crate::{
         challenge::ChallengeGenerator,
-        ligero::{utils::*, Ligero, LigeroPCUniversalParams, PolynomialCommitment},
+        ligero::{utils::*, LigeroPCUniversalParams, PolynomialCommitment, UnivariateLigero},
         LabeledPolynomial,
     };
     use ark_bls12_377::Fq;
@@ -54,7 +54,7 @@ mod tests {
     type Sponge = PoseidonSponge<Fr>;
 
     type LigeroPCS = LinearCodePCS<
-        Ligero<Fr, MTConfig, Blake2s256, Sponge, DensePolynomial<Fr>>,
+        UnivariateLigero<Fr, MTConfig, Blake2s256, Sponge, DensePolynomial<Fr>>,
         Fr,
         DensePolynomial<Fr>,
         Sponge,
@@ -62,7 +62,7 @@ mod tests {
         Blake2s256,
     >;
     type LigeroPcsF<F> = LinearCodePCS<
-        Ligero<F, MTConfig, Blake2s256, Sponge, DensePolynomial<F>>,
+        UnivariateLigero<F, MTConfig, Blake2s256, Sponge, DensePolynomial<F>>,
         F,
         DensePolynomial<F>,
         Sponge,
