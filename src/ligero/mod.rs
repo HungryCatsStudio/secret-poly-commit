@@ -18,12 +18,18 @@ use crate::{Error, LabeledCommitment, LabeledPolynomial, PCUniversalParams, Poly
 
 mod utils;
 
+mod multilinear;
+mod univariate;
+
+pub use univariate::UnivariateLigero;
+pub use multilinear::MultilinearLigero;
+
 mod data_structures;
 use data_structures::*;
 
 pub use data_structures::{
     LigeroPCCommitterKey, LigeroPCProof, LigeroPCUniversalParams, LigeroPCVerifierKey,
-    LinearEncode, UnivariateLigero,
+    LinearEncode,
 };
 
 use utils::{calculate_t, get_indices_from_transcript, hash_column};
