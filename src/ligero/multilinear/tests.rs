@@ -4,7 +4,7 @@ mod tests {
     use crate::ligero::LinearCodePCS;
     use crate::{
         challenge::ChallengeGenerator,
-        ligero::{utils::*, LigeroPCUniversalParams, MultilinearLigero, PolynomialCommitment},
+        ligero::{utils::*, LinCodePCUniversalParams, MultilinearLigero, PolynomialCommitment},
         LabeledPolynomial,
     };
     use ark_bls12_377::Fq;
@@ -100,7 +100,7 @@ mod tests {
             .clone();
         let check_well_formedness = true;
 
-        let pp: LigeroPCUniversalParams<Fr, MTConfig> = LigeroPCUniversalParams::new(
+        let pp: LinCodePCUniversalParams<Fr, MTConfig> = LinCodePCUniversalParams::new(
             128,
             4,
             check_well_formedness,

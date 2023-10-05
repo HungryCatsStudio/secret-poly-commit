@@ -29,7 +29,7 @@ mod data_structures;
 use data_structures::*;
 
 pub use data_structures::{
-    LigeroPCCommitterKey, LigeroPCProof, LigeroPCUniversalParams, LigeroPCVerifierKey,
+    LinCodePCCommitterKey, LinCodePCProof, LinCodePCUniversalParams, LinCodePCVerifierKey,
 };
 
 use utils::{calculate_t, get_indices_from_transcript, hash_column};
@@ -109,19 +109,19 @@ where
     C::InnerDigest: Absorb,
     D: Digest,
 {
-    type UniversalParams = LigeroPCUniversalParams<F, C>;
+    type UniversalParams = LinCodePCUniversalParams<F, C>;
 
-    type CommitterKey = LigeroPCCommitterKey<F, C>;
+    type CommitterKey = LinCodePCCommitterKey<F, C>;
 
-    type VerifierKey = LigeroPCVerifierKey<F, C>;
+    type VerifierKey = LinCodePCVerifierKey<F, C>;
 
-    type PreparedVerifierKey = LigeroPCPreparedVerifierKey;
+    type PreparedVerifierKey = LinCodePCPreparedVerifierKey;
 
-    type Commitment = LigeroPCCommitment<C>;
+    type Commitment = LinCodePCCommitment<C>;
 
-    type PreparedCommitment = LigeroPCPreparedCommitment<C>;
+    type PreparedCommitment = LinCodePCPreparedCommitment<C>;
 
-    type Randomness = LigeroPCRandomness;
+    type Randomness = LinCodePCRandomness;
 
     type Proof = LPCPArray<F, C>;
 
@@ -158,7 +158,7 @@ where
         if pp.max_degree() == 0 {
             return Err(Error::InvalidParameters(FIELD_SIZE_ERROR.to_string()));
         }
-        let ck = LigeroPCCommitterKey::<F, C> {
+        let ck = LinCodePCCommitterKey::<F, C> {
             _field: PhantomData,
             sec_param: pp.sec_param,
             rho_inv: pp.rho_inv,
@@ -166,7 +166,7 @@ where
             two_to_one_params: pp.two_to_one_params.clone(),
             check_well_formedness: pp.check_well_formedness,
         };
-        let vk = LigeroPCVerifierKey::<F, C> {
+        let vk = LinCodePCVerifierKey::<F, C> {
             _field: PhantomData,
             sec_param: pp.sec_param,
             rho_inv: pp.rho_inv,
@@ -221,7 +221,7 @@ where
             let n_ext_cols = ext_mat.m;
 
             // 4. The commitment is just the root, but since each commitment could be to a differently-sized polynomial, we also add some metadata.
-            let commitment = LigeroPCCommitment {
+            let commitment = LinCodePCCommitment {
                 metadata: Metadata {
                     n_rows,
                     n_cols,
@@ -323,7 +323,7 @@ where
                     .map_err(|_| Error::TranscriptError)?;
             }
 
-            proof_array.push(LigeroPCProof {
+            proof_array.push(LinCodePCProof {
                 // compute the opening proof and append b.M to the transcript
                 opening: generate_proof(
                     ck.sec_param,
@@ -534,7 +534,7 @@ fn generate_proof<F, C>(
     ext_mat: &Matrix<F>,
     col_tree: &MerkleTree<C>,
     transcript: &mut IOPTranscript<F>,
-) -> Result<LigeroPCProofSingle<F, C>, Error>
+) -> Result<LinCodePCProofSingle<F, C>, Error>
 where
     F: PrimeField,
     C: Config,
@@ -568,7 +568,7 @@ where
         );
     }
 
-    Ok(LigeroPCProofSingle {
+    Ok(LinCodePCProofSingle {
         paths,
         v,
         columns: queried_columns,
