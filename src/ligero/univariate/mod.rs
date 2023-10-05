@@ -10,6 +10,8 @@ use digest::Digest;
 use super::utils::reed_solomon;
 use super::LinearEncode;
 
+mod tests;
+
 /// The univariate Ligero polynomial commitment scheme based on [[Ligero]][ligero].
 /// The scheme defaults to the naive batching strategy.
 ///

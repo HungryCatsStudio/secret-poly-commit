@@ -33,8 +33,6 @@ pub use data_structures::{
 
 use utils::{calculate_t, get_indices_from_transcript, hash_column};
 
-mod tests;
-
 const FIELD_SIZE_ERROR: &str = "This field is not suitable for the proposed parameters";
 
 /// Any linear-code-based commitment scheme.
