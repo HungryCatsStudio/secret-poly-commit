@@ -5,7 +5,9 @@ mod tests {
     use crate::linear_codes::LinearCodePCS;
     use crate::{
         challenge::ChallengeGenerator,
-        linear_codes::{utils::*, LinCodePCUniversalParams, PolynomialCommitment, UnivariateLigero},
+        linear_codes::{
+            utils::*, LinCodePCUniversalParams, PolynomialCommitment, UnivariateLigero,
+        },
         LabeledPolynomial,
     };
     use ark_bls12_377::Fq;
