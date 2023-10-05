@@ -4,7 +4,7 @@ use ark_crypto_primitives::{
     sponge::{Absorb, CryptographicSponge},
 };
 use ark_ff::PrimeField;
-use ark_poly::DenseUVPolynomial;
+use ark_poly::Polynomial;
 use ark_std::borrow::Borrow;
 use ark_std::marker::PhantomData;
 use ark_std::rand::RngCore;
@@ -39,7 +39,7 @@ where
     C: Config,
     D: Digest,
     S: CryptographicSponge,
-    P: DenseUVPolynomial<F>,
+    P: Polynomial<F>,
     Vec<u8>: Borrow<C::Leaf>,
     L: LinearEncode<F, P, C, D>,
 {
@@ -50,7 +50,7 @@ impl<L, F, P, S, C, D> PolynomialCommitment<F, P, S> for LinearCodePCS<L, F, P, 
 where
     L: LinearEncode<F, P, C, D>,
     F: PrimeField,
-    P: DenseUVPolynomial<F>,
+    P: Polynomial<F>,
     S: CryptographicSponge,
     C: Config + 'static,
     Vec<u8>: Borrow<C::Leaf>,
@@ -230,8 +230,8 @@ where
 
             // 3. Generate vector `b = [1, z^m, z^(2m), ..., z^((m-1)m)]`
             // This could potentially fail when n_cols > 1<<64, but `ck` won't allow commiting to such polynomials.
-            let point_pow = point.pow([n_cols as u64]);
-            let (b, _) = L::tensor(&point_pow, n_rows);
+            // let point_pow = point.pow([n_cols as u64]);
+            let (_, b) = L::tensor(&point, n_cols, n_rows);
 
             let mut transcript = IOPTranscript::new(b"transcript");
             transcript
@@ -258,9 +258,12 @@ where
                 None
             };
 
-            transcript
-                .append_serializable_element(b"point", point)
-                .map_err(|_| Error::TranscriptError)?;
+            let point_vec = L::point_to_vec(point.clone());
+            for element in point_vec.iter() {
+                transcript
+                    .append_serializable_element(b"point", element)
+                    .map_err(|_| Error::TranscriptError)?;
+            }
 
             proof_array.push(LigeroPCProof {
                 // compute the opening proof and append b.M to the transcript
@@ -349,9 +352,12 @@ where
 
             // 1. Seed the transcript with the point and the recieved vector
             // TODO Consider removing the evaluation point from the transcript.
-            transcript
-                .append_serializable_element(b"point", point)
-                .map_err(|_| Error::TranscriptError)?;
+            let point_vec = L::point_to_vec(point.clone());
+            for element in point_vec.iter() {
+                transcript
+                    .append_serializable_element(b"point", element)
+                    .map_err(|_| Error::TranscriptError)?;
+            }
             transcript
                 .append_serializable_element(b"v", &proof_array[i].opening.v)
                 .map_err(|_| Error::TranscriptError)?;
@@ -394,8 +400,7 @@ where
 
             // 6. Compute a = [1, z, z^2, ..., z^(n_cols_1)]
             // where z denotes the query `point`.
-            let (a, z_to_n) = L::tensor(point, n_cols);
-            let (b, _) = L::tensor(&z_to_n, n_rows);
+            let (a, b) = L::tensor(point, n_cols, n_rows);
 
             // Compute b = [1, z^n_cols, z^(2*n_cols), ..., z^((n_rows-1)*n_cols)]
             let coeffs: &[F] = &b;

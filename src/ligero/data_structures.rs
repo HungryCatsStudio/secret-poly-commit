@@ -9,7 +9,7 @@ use ark_crypto_primitives::{
     sponge::CryptographicSponge,
 };
 use ark_ff::PrimeField;
-use ark_poly::DenseUVPolynomial;
+use ark_poly::{DenseUVPolynomial, Polynomial};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::borrow::Borrow;
 use ark_std::marker::PhantomData;
@@ -29,7 +29,7 @@ use super::utils::{
 pub trait LinearEncode<F, P, C, D>
 where
     F: PrimeField,
-    P: DenseUVPolynomial<F>,
+    P: Polynomial<F>,
     C: Config,
     D: Digest,
     Vec<u8>: Borrow<C::Leaf>,
@@ -37,9 +37,17 @@ where
     /// Encode a message, which is interpreted as a vector of coefficients
     /// of a polynomial of degree m - 1.
     fn encode(msg: &[F], rho_inv: usize) -> Vec<F>;
+
+    /// Get the representation of the polynomial
+    fn poly_repr(polynomial: &P) -> Vec<F>;
+
+    /// How we choose to split the query point into a Vec of Field elements.
+    /// Needed for appending to transcript.
+    fn point_to_vec(point: P::Point) -> Vec<F>;
+
     /// Compute the matrices for the polynomial
     fn compute_matrices(polynomial: &P, rho_inv: usize) -> (Matrix<F>, Matrix<F>) {
-        let mut coeffs = polynomial.coeffs().to_vec();
+        let mut coeffs = Self::poly_repr(polynomial);
 
         // 1. Computing parameters and initial matrix
         let (n_rows, n_cols) = compute_dimensions::<F>(polynomial.degree() + 1); // for 6 coefficients, this is returning 4 x 2 with a row of 0s: fix
@@ -127,7 +135,7 @@ where
     }
 
     /// Tensor the point
-    fn tensor(point: &F, len: usize) -> (Vec<F>, F);
+    fn tensor(point: &P::Point, left_len: usize, right_len: usize) -> (Vec<F>, Vec<F>);
 }
 
 /// The univariate Ligero polynomial commitment scheme based on [[Ligero]][ligero].
@@ -154,20 +162,38 @@ where
     S: CryptographicSponge,
     P: DenseUVPolynomial<F>,
     Vec<u8>: Borrow<C::Leaf>,
+    P::Point: Into<F>,
 {
     fn encode(msg: &[F], rho_inv: usize) -> Vec<F> {
         reed_solomon(msg, rho_inv)
     }
 
+    /// For a univariate polynomial, we simply return the list of coefficients.ś
+    fn poly_repr(polynomial: &P) -> Vec<F> {
+        polynomial.coeffs().to_vec()
+    }
+
+    fn point_to_vec(point: P::Point) -> Vec<F> {
+        vec![point]
+    }
+
     /// Compute out = [1, z, z^2, ..., z^(n_cols_1)]
-    fn tensor(z: &F, len: usize) -> (Vec<F>, F) {
-        let mut out = Vec::with_capacity(len);
-        let mut pow_z = F::one();
-        for _ in 0..len {
-            out.push(pow_z);
-            pow_z *= z;
+    fn tensor(z: &F, left: usize, right: usize) -> (Vec<F>, Vec<F>) {
+        let mut left_out = Vec::with_capacity(left);
+        let mut pow_a = F::one();
+        for _ in 0..left {
+            left_out.push(pow_a);
+            pow_a *= z;
         }
-        (out, pow_z)
+
+        let mut right_out = Vec::with_capacity(right);
+        let mut pow_b = F::one();
+        for _ in 0..right {
+            right_out.push(pow_b);
+            pow_b *= pow_a;
+        }
+
+        (left_out, right_out)
     }
 }
 
