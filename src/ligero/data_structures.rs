@@ -125,6 +125,9 @@ where
             columns: queried_columns,
         })
     }
+
+    /// Tensor the point
+    fn tensor(point: &F, len: usize) -> (Vec<F>, F);
 }
 
 /// The univariate Ligero polynomial commitment scheme based on [[Ligero]][ligero].
@@ -154,6 +157,17 @@ where
 {
     fn encode(msg: &[F], rho_inv: usize) -> Vec<F> {
         reed_solomon(msg, rho_inv)
+    }
+
+    /// Compute out = [1, z, z^2, ..., z^(n_cols_1)]
+    fn tensor(z: &F, len: usize) -> (Vec<F>, F) {
+        let mut out = Vec::with_capacity(len);
+        let mut pow_z = F::one();
+        for _ in 0..len {
+            out.push(pow_z);
+            pow_z *= z;
+        }
+        (out, pow_z)
     }
 }
 

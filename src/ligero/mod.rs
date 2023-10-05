@@ -229,14 +229,9 @@ where
                 L::create_merkle_tree(&ext_mat, &ck.leaf_hash_params, &ck.two_to_one_params);
 
             // 3. Generate vector `b = [1, z^m, z^(2m), ..., z^((m-1)m)]`
-            let mut b = Vec::new();
             // This could potentially fail when n_cols > 1<<64, but `ck` won't allow commiting to such polynomials.
             let point_pow = point.pow([n_cols as u64]);
-            let mut pow_b = F::one();
-            for _ in 0..n_rows {
-                b.push(pow_b);
-                pow_b *= point_pow;
-            }
+            let (b, _) = L::tensor(&point_pow, n_rows);
 
             let mut transcript = IOPTranscript::new(b"transcript");
             transcript
@@ -399,20 +394,10 @@ where
 
             // 6. Compute a = [1, z, z^2, ..., z^(n_cols_1)]
             // where z denotes the query `point`.
-            let mut a = Vec::with_capacity(n_cols);
-            let mut pow_a = F::one();
-            for _ in 0..n_cols {
-                a.push(pow_a);
-                pow_a *= point;
-            }
+            let (a, z_to_n) = L::tensor(point, n_cols);
+            let (b, _) = L::tensor(&z_to_n, n_rows);
 
             // Compute b = [1, z^n_cols, z^(2*n_cols), ..., z^((n_rows-1)*n_cols)]
-            let mut b = Vec::with_capacity(n_rows);
-            let mut pow_b = F::one();
-            for _ in 0..n_rows {
-                b.push(pow_b);
-                pow_b *= pow_a;
-            }
             let coeffs: &[F] = &b;
 
             // 7. Probabilistic checks that whatever the prover sent,
