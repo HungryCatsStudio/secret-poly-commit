@@ -22,7 +22,7 @@ mod data_structures;
 use data_structures::*;
 
 pub use data_structures::{
-    Ligero, LigeroPCCommitterKey, LigeroPCProof, LigeroPCUniversalParams, LigeroPCVerifierKey,
+    Ligero, LigeroPCCommitterKey, LigeroPCProof, LigeroPCUniversalParams, LigeroPCVerifierKey, LinearEncode
 };
 
 use utils::{calculate_t, get_indices_from_transcript, hash_column};

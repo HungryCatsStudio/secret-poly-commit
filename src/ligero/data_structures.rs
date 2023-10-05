@@ -25,6 +25,16 @@ use super::utils::{
     IOPTranscript,
 };
 
+/// A trait for linear encoding a messsage.
+///
+pub trait LinearEncode<F: PrimeField, P: DenseUVPolynomial<F>> {
+    /// Encode a message, which is interpreted as a vector of coefficients
+    /// of a polynomial of degree m - 1.
+    fn encode(msg: &[F], rho_inv: usize) -> Vec<F>;
+    /// Compute the matrices for the polynomial
+    fn compute_matrices(polynomial: &P, rho_inv: usize) -> (Matrix<F>, Matrix<F>);
+}
+
 /// The univariate Ligero polynomial commitment scheme based on [[Ligero]][ligero].
 /// The scheme defaults to the naive batching strategy.
 ///
@@ -39,6 +49,37 @@ pub struct Ligero<
     P: DenseUVPolynomial<F>,
 > {
     _phantom: PhantomData<(F, C, D, S, P)>,
+}
+
+impl<F: PrimeField, C: Config, D: Digest, S: CryptographicSponge, P: DenseUVPolynomial<F>>
+    LinearEncode<F, P> for Ligero<F, C, D, S, P>
+{
+    fn encode(msg: &[F], rho_inv: usize) -> Vec<F> {
+        reed_solomon(msg, rho_inv)
+    }
+
+    fn compute_matrices(polynomial: &P, rho_inv: usize) -> (Matrix<F>, Matrix<F>) {
+        let mut coeffs = polynomial.coeffs().to_vec();
+
+        // 1. Computing parameters and initial matrix
+        let (n_rows, n_cols) = compute_dimensions::<F>(polynomial.degree() + 1); // for 6 coefficients, this is returning 4 x 2 with a row of 0s: fix
+
+        // padding the coefficient vector with zeroes
+        // TODO is this the most efficient/safest way to do it?
+        coeffs.resize(n_rows * n_cols, F::zero());
+
+        let mat = Matrix::new_from_flat(n_rows, n_cols, &coeffs);
+
+        // 2. Apply Reed-Solomon encoding row-wise
+        let ext_mat = Matrix::new_from_rows(
+            mat.rows()
+                .iter()
+                .map(|r| Self::encode(r, rho_inv))
+                .collect(),
+        );
+
+        (mat, ext_mat)
+    }
 }
 
 impl<F, C, D, S, P> Ligero<F, C, D, S, P>
@@ -58,28 +99,6 @@ where
         }
     }
 
-    pub(crate) fn compute_matrices(polynomial: &P, rho_inv: usize) -> (Matrix<F>, Matrix<F>) {
-        let mut coeffs = polynomial.coeffs().to_vec();
-
-        // 1. Computing parameters and initial matrix
-        let (n_rows, n_cols) = compute_dimensions::<F>(polynomial.degree() + 1); // for 6 coefficients, this is returning 4 x 2 with a row of 0s: fix
-
-        // padding the coefficient vector with zeroes
-        // TODO is this the most efficient/safest way to do it?
-        coeffs.resize(n_rows * n_cols, F::zero());
-
-        let mat = Matrix::new_from_flat(n_rows, n_cols, &coeffs);
-
-        // 2. Apply Reed-Solomon encoding row-wise
-        let ext_mat = Matrix::new_from_rows(
-            mat.rows()
-                .iter()
-                .map(|r| reed_solomon(r, rho_inv))
-                .collect(),
-        );
-
-        (mat, ext_mat)
-    }
     pub(crate) fn create_merkle_tree(
         ext_mat: &Matrix<F>,
         leaf_hash_params: &<<C as Config>::LeafHash as CRHScheme>::Parameters,

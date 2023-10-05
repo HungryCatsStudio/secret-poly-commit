@@ -19,7 +19,7 @@ use crate::streaming_kzg::ceil_div;
 use crate::Error;
 
 #[derive(Debug)]
-pub(crate) struct Matrix<F: Field> {
+pub struct Matrix<F: Field> {
     pub(crate) n: usize,
     pub(crate) m: usize,
     entries: Vec<Vec<F>>,
