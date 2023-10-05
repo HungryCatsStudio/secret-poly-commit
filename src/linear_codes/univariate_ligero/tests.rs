@@ -1,10 +1,11 @@
 #[cfg(test)]
 mod tests {
 
-    use crate::ligero::LinearCodePCS;
+    use crate::ark_std::UniformRand;
+    use crate::linear_codes::LinearCodePCS;
     use crate::{
         challenge::ChallengeGenerator,
-        ligero::{utils::*, LinCodePCUniversalParams, MultilinearLigero, PolynomialCommitment},
+        linear_codes::{utils::*, LinCodePCUniversalParams, PolynomialCommitment, UnivariateLigero},
         LabeledPolynomial,
     };
     use ark_bls12_377::Fq;
@@ -16,7 +17,7 @@ mod tests {
         sponge::poseidon::PoseidonSponge,
     };
     use ark_ff::{Field, PrimeField};
-    use ark_poly::evaluations::multivariate::{MultilinearExtension, SparseMultilinearExtension};
+    use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial};
     use ark_std::test_rng;
     use blake2::Blake2s256;
     use rand_chacha::{rand_core::SeedableRng, ChaCha20Rng};
@@ -48,50 +49,41 @@ mod tests {
     type Sponge = PoseidonSponge<Fr>;
 
     type LigeroPCS = LinearCodePCS<
-        MultilinearLigero<Fr, MTConfig, Blake2s256, Sponge, SparseMultilinearExtension<Fr>>,
+        UnivariateLigero<Fr, MTConfig, Blake2s256, Sponge, DensePolynomial<Fr>>,
         Fr,
-        SparseMultilinearExtension<Fr>,
+        DensePolynomial<Fr>,
         Sponge,
         MTConfig,
         Blake2s256,
     >;
     type LigeroPcsF<F> = LinearCodePCS<
-        MultilinearLigero<F, MTConfig, Blake2s256, Sponge, SparseMultilinearExtension<F>>,
+        UnivariateLigero<F, MTConfig, Blake2s256, Sponge, DensePolynomial<F>>,
         F,
-        SparseMultilinearExtension<F>,
+        DensePolynomial<F>,
         Sponge,
         MTConfig,
         Blake2s256,
     >;
 
     fn rand_poly<Fr: PrimeField>(
-        _: usize,
-        num_vars: Option<usize>,
+        degree: usize,
+        _: Option<usize>,
         rng: &mut ChaCha20Rng,
-    ) -> SparseMultilinearExtension<Fr> {
-        match num_vars {
-            Some(n) => SparseMultilinearExtension::rand(n, rng),
-            None => unimplemented!(), // should not happen in ML case!
-        }
+    ) -> DensePolynomial<Fr> {
+        DensePolynomial::rand(degree, rng)
     }
 
     fn constant_poly<Fr: PrimeField>(
         _: usize,
-        num_vars: Option<usize>,
+        _: Option<usize>,
         rng: &mut ChaCha20Rng,
-    ) -> SparseMultilinearExtension<Fr> {
-        // f1 = (1-x1)(1-x2)(1-x3)(1-x5)[(1-x6)*x4 + 2(1-x4)*x6]
-        match num_vars {
-            Some(n) => {
-                let points = vec![(1, Fr::rand(rng))];
-                SparseMultilinearExtension::from_evaluations(n, &points)
-            }
-            None => unimplemented!(), // should not happen in ML case!
-        }
+    ) -> DensePolynomial<Fr> {
+        DensePolynomial::from_coefficients_slice(&[Fr::rand(rng)])
     }
 
     #[test]
     fn test_construction() {
+        let degree = 4;
         let mut rng = &mut test_rng();
         // just to make sure we have the right degree given the FFT domain for our field
         let leaf_hash_params = <LeafH as CRHScheme>::setup(&mut rng).unwrap();
@@ -113,15 +105,15 @@ mod tests {
         let rand_chacha = &mut ChaCha20Rng::from_rng(test_rng()).unwrap();
         let labeled_poly = LabeledPolynomial::new(
             "test".to_string(),
-            rand_poly(1, Some(5), rand_chacha),
-            Some(5),
-            Some(5),
+            rand_poly(degree, None, rand_chacha),
+            None,
+            None,
         );
 
         let mut test_sponge = test_sponge::<Fr>();
         let (c, rands) = LigeroPCS::commit(&ck, &[labeled_poly.clone()], None).unwrap();
 
-        let point = rand_point(Some(5), rand_chacha);
+        let point = Fr::rand(rand_chacha);
 
         let value = labeled_poly.evaluate(&point);
 
@@ -162,25 +154,22 @@ mod tests {
         calculate_t::<Fq>(400, 4, 2_usize.pow(32)).unwrap_err();
     }
 
-    fn rand_point<F: Field>(num_vars: Option<usize>, rng: &mut ChaCha20Rng) -> Vec<F> {
-        match num_vars {
-            Some(n) => (0..n).map(|_| F::rand(rng)).collect(),
-            None => unimplemented!(), // should not happen!
-        }
+    fn rand_point<F: Field>(_: Option<usize>, rng: &mut ChaCha20Rng) -> F {
+        F::rand(rng)
     }
 
     #[test]
     fn single_poly_test() {
         use crate::tests::*;
         single_poly_test::<_, _, LigeroPCS, _>(
-            Some(5),
+            None,
             rand_poly::<Fr>,
             rand_point::<Fr>,
             poseidon_sponge_for_test,
         )
         .expect("test failed for bls12-377");
         single_poly_test::<_, _, LigeroPcsF<Fr381>, _>(
-            Some(10),
+            None,
             rand_poly::<Fr381>,
             rand_point::<Fr381>,
             poseidon_sponge_for_test,
@@ -192,15 +181,100 @@ mod tests {
     fn constant_poly_test() {
         use crate::tests::*;
         single_poly_test::<_, _, LigeroPCS, _>(
-            Some(10),
+            None,
             constant_poly::<Fr>,
             rand_point::<Fr>,
             poseidon_sponge_for_test,
         )
         .expect("test failed for bls12-377");
         single_poly_test::<_, _, LigeroPcsF<Fr381>, _>(
-            Some(5),
+            None,
             constant_poly::<Fr381>,
+            rand_point::<Fr381>,
+            poseidon_sponge_for_test,
+        )
+        .expect("test failed for bls12-381");
+    }
+
+    #[test]
+    fn quadratic_poly_degree_bound_multiple_queries_test() {
+        use crate::tests::*;
+        quadratic_poly_degree_bound_multiple_queries_test::<_, _, LigeroPCS, _>(
+            rand_poly::<Fr>,
+            rand_point::<Fr>,
+            poseidon_sponge_for_test,
+        )
+        .expect("test failed for bls12-377");
+        quadratic_poly_degree_bound_multiple_queries_test::<_, _, LigeroPcsF<Fr381>, _>(
+            rand_poly::<Fr381>,
+            rand_point::<Fr381>,
+            poseidon_sponge_for_test,
+        )
+        .expect("test failed for bls12-381");
+    }
+
+    #[test]
+    fn linear_poly_degree_bound_test() {
+        use crate::tests::*;
+        linear_poly_degree_bound_test::<_, _, LigeroPCS, _>(
+            rand_poly::<Fr>,
+            rand_point::<Fr>,
+            poseidon_sponge_for_test,
+        )
+        .expect("test failed for bls12-377");
+        linear_poly_degree_bound_test::<_, _, LigeroPcsF<Fr381>, _>(
+            rand_poly::<Fr381>,
+            rand_point::<Fr381>,
+            poseidon_sponge_for_test,
+        )
+        .expect("test failed for bls12-381");
+    }
+
+    #[test]
+    fn single_poly_degree_bound_test() {
+        use crate::tests::*;
+        single_poly_degree_bound_test::<_, _, LigeroPCS, _>(
+            rand_poly::<Fr>,
+            rand_point::<Fr>,
+            poseidon_sponge_for_test,
+        )
+        .expect("test failed for bls12-377");
+        single_poly_degree_bound_test::<_, _, LigeroPcsF<Fr381>, _>(
+            rand_poly::<Fr381>,
+            rand_point::<Fr381>,
+            poseidon_sponge_for_test,
+        )
+        .expect("test failed for bls12-381");
+    }
+
+    #[test]
+    fn single_poly_degree_bound_multiple_queries_test() {
+        use crate::tests::*;
+        single_poly_degree_bound_multiple_queries_test::<_, _, LigeroPCS, _>(
+            rand_poly::<Fr>,
+            rand_point::<Fr>,
+            poseidon_sponge_for_test,
+        )
+        .expect("test failed for bls12-377");
+        single_poly_degree_bound_multiple_queries_test::<_, _, LigeroPcsF<Fr381>, _>(
+            rand_poly::<Fr381>,
+            rand_point::<Fr381>,
+            poseidon_sponge_for_test,
+        )
+        .expect("test failed for bls12-381");
+    }
+
+    #[test]
+    fn two_polys_degree_bound_single_query_test() {
+        use crate::tests::*;
+        two_polys_degree_bound_single_query_test::<_, _, LigeroPCS, _>(
+            rand_poly::<Fr>,
+            rand_point::<Fr>,
+            poseidon_sponge_for_test,
+        )
+        .expect("test failed for bls12-377");
+        two_polys_degree_bound_single_query_test::<_, _, LigeroPcsF<Fr381>, _>(
+            rand_poly::<Fr381>,
             rand_point::<Fr381>,
             poseidon_sponge_for_test,
         )
@@ -211,7 +285,7 @@ mod tests {
     fn full_end_to_end_test() {
         use crate::tests::*;
         full_end_to_end_test::<_, _, LigeroPCS, _>(
-            Some(8),
+            None,
             rand_poly::<Fr>,
             rand_point::<Fr>,
             poseidon_sponge_for_test,
@@ -219,7 +293,7 @@ mod tests {
         .expect("test failed for bls12-377");
         println!("Finished bls12-377");
         full_end_to_end_test::<_, _, LigeroPcsF<Fr381>, _>(
-            Some(3),
+            None,
             rand_poly::<Fr381>,
             rand_point::<Fr381>,
             poseidon_sponge_for_test,
@@ -232,7 +306,7 @@ mod tests {
     fn single_equation_test() {
         use crate::tests::*;
         single_equation_test::<_, _, LigeroPCS, _>(
-            Some(10),
+            None,
             rand_poly::<Fr>,
             rand_point::<Fr>,
             poseidon_sponge_for_test,
@@ -240,7 +314,7 @@ mod tests {
         .expect("test failed for bls12-377");
         println!("Finished bls12-377");
         single_equation_test::<_, _, LigeroPcsF<Fr381>, _>(
-            Some(5),
+            None,
             rand_poly::<Fr381>,
             rand_point::<Fr381>,
             poseidon_sponge_for_test,
@@ -253,7 +327,7 @@ mod tests {
     fn two_equation_test() {
         use crate::tests::*;
         two_equation_test::<_, _, LigeroPCS, _>(
-            Some(5),
+            None,
             rand_poly::<Fr>,
             rand_point::<Fr>,
             poseidon_sponge_for_test,
@@ -261,7 +335,26 @@ mod tests {
         .expect("test failed for bls12-377");
         println!("Finished bls12-377");
         two_equation_test::<_, _, LigeroPcsF<Fr381>, _>(
-            Some(10),
+            None,
+            rand_poly::<Fr381>,
+            rand_point::<Fr381>,
+            poseidon_sponge_for_test,
+        )
+        .expect("test failed for bls12-381");
+        println!("Finished bls12-381");
+    }
+
+    #[test]
+    fn two_equation_degree_bound_test() {
+        use crate::tests::*;
+        two_equation_degree_bound_test::<_, _, LigeroPCS, _>(
+            rand_poly::<Fr>,
+            rand_point::<Fr>,
+            poseidon_sponge_for_test,
+        )
+        .expect("test failed for bls12-377");
+        println!("Finished bls12-377");
+        two_equation_degree_bound_test::<_, _, LigeroPcsF<Fr381>, _>(
             rand_poly::<Fr381>,
             rand_point::<Fr381>,
             poseidon_sponge_for_test,
@@ -274,7 +367,7 @@ mod tests {
     fn full_end_to_end_equation_test() {
         use crate::tests::*;
         full_end_to_end_equation_test::<_, _, LigeroPCS, _>(
-            Some(5),
+            None,
             rand_poly::<Fr>,
             rand_point::<Fr>,
             poseidon_sponge_for_test,
@@ -282,12 +375,26 @@ mod tests {
         .expect("test failed for bls12-377");
         println!("Finished bls12-377");
         full_end_to_end_equation_test::<_, _, LigeroPcsF<Fr381>, _>(
-            Some(8),
+            None,
             rand_poly::<Fr381>,
             rand_point::<Fr381>,
             poseidon_sponge_for_test,
         )
         .expect("test failed for bls12-381");
         println!("Finished bls12-381");
+    }
+
+    #[test]
+    #[should_panic]
+    fn bad_degree_bound_test() {
+        use crate::tests::*;
+        use ark_bls12_381::Fq as Fq381;
+        bad_degree_bound_test::<_, _, LigeroPcsF<Fq381>, _>(
+            rand_poly::<Fq381>,
+            rand_point::<Fq381>,
+            poseidon_sponge_for_test,
+        )
+        .expect("test failed for bls12-377");
+        println!("Finished bls12-377");
     }
 }

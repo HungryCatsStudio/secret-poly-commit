@@ -20,7 +20,7 @@ use ark_std::vec::Vec;
 ///     merkle_tree::{ByteDigestConverter, Config},
 /// };
 /// use ark_std::test_rng;
-/// use ark_poly_commit::ligero::LinCodePCUniversalParams;
+/// use ark_poly_commit::linear_codes::LinCodePCUniversalParams;
 /// use core::marker::PhantomData;
 ///
 /// type LeafH = Sha256;

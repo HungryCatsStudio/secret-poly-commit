@@ -14,16 +14,16 @@ use ark_std::vec::Vec;
 
 use digest::Digest;
 
-use crate::ligero::utils::*;
+use crate::linear_codes::utils::*;
 use crate::{Error, LabeledCommitment, LabeledPolynomial, PCUniversalParams, PolynomialCommitment};
 
 mod utils;
 
-mod multilinear;
-mod univariate;
+mod multilinear_ligero;
+mod univariate_ligero;
 
-pub use multilinear::MultilinearLigero;
-pub use univariate::UnivariateLigero;
+pub use multilinear_ligero::MultilinearLigero;
+pub use univariate_ligero::UnivariateLigero;
 
 mod data_structures;
 use data_structures::*;
