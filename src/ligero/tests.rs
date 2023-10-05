@@ -4,7 +4,7 @@ mod tests {
     use crate::ark_std::UniformRand;
     use crate::{
         challenge::ChallengeGenerator,
-        ligero::{utils::*, Ligero, LigeroPCUniversalParams, PolynomialCommitment},
+        ligero::{utils::*, Ligero, LigeroPCUniversalParams, LinearEncode, PolynomialCommitment},
         LabeledPolynomial,
     };
     use ark_bls12_377::Fq;

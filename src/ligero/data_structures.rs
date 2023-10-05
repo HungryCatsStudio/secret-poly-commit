@@ -27,37 +27,18 @@ use super::utils::{
 
 /// A trait for linear encoding a messsage.
 ///
-pub trait LinearEncode<F: PrimeField, P: DenseUVPolynomial<F>> {
+pub trait LinearEncode<F, P, C, D>
+where
+    F: PrimeField,
+    P: DenseUVPolynomial<F>,
+    C: Config,
+    D: Digest,
+    Vec<u8>: Borrow<C::Leaf>,
+{
     /// Encode a message, which is interpreted as a vector of coefficients
     /// of a polynomial of degree m - 1.
     fn encode(msg: &[F], rho_inv: usize) -> Vec<F>;
     /// Compute the matrices for the polynomial
-    fn compute_matrices(polynomial: &P, rho_inv: usize) -> (Matrix<F>, Matrix<F>);
-}
-
-/// The univariate Ligero polynomial commitment scheme based on [[Ligero]][ligero].
-/// The scheme defaults to the naive batching strategy.
-///
-/// Note: The scheme currently does not support hiding.
-///
-/// [ligero]: https://eprint.iacr.org/2022/1608.pdf
-pub struct Ligero<
-    F: PrimeField,
-    C: Config,
-    D: Digest,
-    S: CryptographicSponge,
-    P: DenseUVPolynomial<F>,
-> {
-    _phantom: PhantomData<(F, C, D, S, P)>,
-}
-
-impl<F: PrimeField, C: Config, D: Digest, S: CryptographicSponge, P: DenseUVPolynomial<F>>
-    LinearEncode<F, P> for Ligero<F, C, D, S, P>
-{
-    fn encode(msg: &[F], rho_inv: usize) -> Vec<F> {
-        reed_solomon(msg, rho_inv)
-    }
-
     fn compute_matrices(polynomial: &P, rho_inv: usize) -> (Matrix<F>, Matrix<F>) {
         let mut coeffs = polynomial.coeffs().to_vec();
 
@@ -80,6 +61,56 @@ impl<F: PrimeField, C: Config, D: Digest, S: CryptographicSponge, P: DenseUVPoly
 
         (mat, ext_mat)
     }
+
+    /// TODO docs
+    fn create_merkle_tree(
+        ext_mat: &Matrix<F>,
+        leaf_hash_params: &<<C as Config>::LeafHash as CRHScheme>::Parameters,
+        two_to_one_params: &<<C as Config>::TwoToOneHash as TwoToOneCRHScheme>::Parameters,
+    ) -> MerkleTree<C> {
+        let mut col_hashes: Vec<Vec<u8>> = Vec::new();
+        let ext_mat_cols = ext_mat.cols();
+
+        for col in ext_mat_cols.iter() {
+            col_hashes.push(hash_column::<D, F>(col));
+        }
+
+        // pad the column hashes with zeroes
+        let next_pow_of_two = col_hashes.len().next_power_of_two();
+        col_hashes.resize(next_pow_of_two, vec![0; <D as Digest>::output_size()]);
+
+        MerkleTree::<C>::new(leaf_hash_params, two_to_one_params, col_hashes).unwrap()
+    }
+}
+
+/// The univariate Ligero polynomial commitment scheme based on [[Ligero]][ligero].
+/// The scheme defaults to the naive batching strategy.
+///
+/// Note: The scheme currently does not support hiding.
+///
+/// [ligero]: https://eprint.iacr.org/2022/1608.pdf
+pub struct Ligero<
+    F: PrimeField,
+    C: Config,
+    D: Digest,
+    S: CryptographicSponge,
+    P: DenseUVPolynomial<F>,
+> {
+    _phantom: PhantomData<(F, C, D, S, P)>,
+}
+
+impl<F, C, D, S, P> LinearEncode<F, P, C, D> for Ligero<F, C, D, S, P>
+where
+    F: PrimeField,
+    C: Config,
+    D: Digest,
+    S: CryptographicSponge,
+    P: DenseUVPolynomial<F>,
+    Vec<u8>: Borrow<C::Leaf>,
+{
+    fn encode(msg: &[F], rho_inv: usize) -> Vec<F> {
+        reed_solomon(msg, rho_inv)
+    }
 }
 
 impl<F, C, D, S, P> Ligero<F, C, D, S, P>
@@ -97,25 +128,6 @@ where
         Self {
             _phantom: PhantomData,
         }
-    }
-
-    pub(crate) fn create_merkle_tree(
-        ext_mat: &Matrix<F>,
-        leaf_hash_params: &<<C as Config>::LeafHash as CRHScheme>::Parameters,
-        two_to_one_params: &<<C as Config>::TwoToOneHash as TwoToOneCRHScheme>::Parameters,
-    ) -> MerkleTree<C> {
-        let mut col_hashes: Vec<Vec<u8>> = Vec::new();
-        let ext_mat_cols = ext_mat.cols();
-
-        for col in ext_mat_cols.iter() {
-            col_hashes.push(hash_column::<D, F>(col));
-        }
-
-        // pad the column hashes with zeroes
-        let next_pow_of_two = col_hashes.len().next_power_of_two();
-        col_hashes.resize(next_pow_of_two, vec![0; <D as Digest>::output_size()]);
-
-        MerkleTree::<C>::new(leaf_hash_params, two_to_one_params, col_hashes).unwrap()
     }
 
     pub(crate) fn generate_proof(
