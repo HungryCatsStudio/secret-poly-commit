@@ -13,7 +13,7 @@ use ark_std::vec::Vec;
 
 use digest::Digest;
 
-use crate::ligero::utils::{inner_product, reed_solomon, IOPTranscript};
+use crate::ligero::utils::{inner_product, IOPTranscript};
 use crate::{Error, LabeledCommitment, LabeledPolynomial, PCUniversalParams, PolynomialCommitment};
 
 mod utils;
@@ -395,7 +395,7 @@ where
             };
 
             // 5. Compute the encoding w = E(v)
-            let w = reed_solomon(&proof_array[i].opening.v, vk.rho_inv);
+            let w = L::encode(&proof_array[i].opening.v, vk.rho_inv);
 
             // 6. Compute a = [1, z, z^2, ..., z^(n_cols_1)]
             // where z denotes the query `point`.
@@ -419,7 +419,7 @@ where
             // matches with what the verifier computed for himself.
             // Note: we sacrifice some code repetition in order not to repeat execution.
             if let (Some(well_formedness), Some(r)) = out {
-                let w_well_formedness = reed_solomon(well_formedness, vk.rho_inv);
+                let w_well_formedness = L::encode(well_formedness, vk.rho_inv);
                 for (transcript_index, matrix_index) in indices.iter().enumerate() {
                     check_inner_product(
                         &r,
