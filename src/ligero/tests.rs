@@ -2,9 +2,10 @@
 mod tests {
 
     use crate::ark_std::UniformRand;
+    use crate::ligero::LinearCodePCS;
     use crate::{
         challenge::ChallengeGenerator,
-        ligero::{utils::*, Ligero, LigeroPCUniversalParams, LinearEncode, PolynomialCommitment},
+        ligero::{utils::*, Ligero, LigeroPCUniversalParams, PolynomialCommitment},
         LabeledPolynomial,
     };
     use ark_bls12_377::Fq;
@@ -26,7 +27,6 @@ mod tests {
     use blake2::Blake2s256;
     use rand_chacha::{rand_core::SeedableRng, ChaCha20Rng};
 
-    type UniPoly = DensePolynomial<Fr>;
     #[derive(Clone)]
     pub(super) struct Window4x256;
     impl pedersen::Window for Window4x256 {
@@ -52,9 +52,23 @@ mod tests {
 
     type MTConfig = MerkleTreeParams;
     type Sponge = PoseidonSponge<Fr>;
-    type PC<F, C, D, S, P> = Ligero<F, C, D, S, P>;
-    type LigeroPCS = PC<Fr, MTConfig, Blake2s256, Sponge, UniPoly>;
-    type LigeroPcsF<F> = PC<F, MTConfig, Blake2s256, Sponge, DensePolynomial<F>>;
+
+    type LigeroPCS = LinearCodePCS<
+        Ligero<Fr, MTConfig, Blake2s256, Sponge, DensePolynomial<Fr>>,
+        Fr,
+        DensePolynomial<Fr>,
+        Sponge,
+        MTConfig,
+        Blake2s256,
+    >;
+    type LigeroPcsF<F> = LinearCodePCS<
+        Ligero<F, MTConfig, Blake2s256, Sponge, DensePolynomial<F>>,
+        F,
+        DensePolynomial<F>,
+        Sponge,
+        MTConfig,
+        Blake2s256,
+    >;
 
     #[test]
     fn test_matrix_constructor_flat() {
@@ -160,40 +174,6 @@ mod tests {
     }
 
     #[test]
-    fn test_merkle_tree() {
-        let mut rng = &mut test_rng();
-        let leaf_hash_params = <LeafH as CRHScheme>::setup(&mut rng).unwrap();
-        let two_to_one_params = <CompressH as TwoToOneCRHScheme>::setup(&mut rng)
-            .unwrap()
-            .clone();
-
-        let rows: Vec<Vec<Fr>> = vec![
-            to_field(vec![4, 76]),
-            to_field(vec![14, 92]),
-            to_field(vec![17, 89]),
-        ];
-
-        let mat = Matrix::new_from_rows(rows);
-        let mt = LigeroPCS::create_merkle_tree(&mat, &leaf_hash_params, &two_to_one_params);
-
-        let root = mt.root();
-
-        for (i, col) in mat.cols().iter().enumerate() {
-            let col_hash = hash_column::<Blake2s256, Fr>(col);
-
-            let proof = mt.generate_proof(i).unwrap();
-            assert!(proof
-                .verify(
-                    &leaf_hash_params,
-                    &two_to_one_params,
-                    &root,
-                    col_hash.clone()
-                )
-                .unwrap());
-        }
-    }
-
-    #[test]
     fn test_get_num_bytes() {
         assert_eq!(get_num_bytes(0), 0);
         assert_eq!(get_num_bytes(1), 1);
@@ -252,7 +232,6 @@ mod tests {
         let degree = 4;
         let mut rng = &mut test_rng();
         // just to make sure we have the right degree given the FFT domain for our field
-        LigeroPCS::setup(degree, None, rng).unwrap();
         let leaf_hash_params = <LeafH as CRHScheme>::setup(&mut rng).unwrap();
         let two_to_one_params = <CompressH as TwoToOneCRHScheme>::setup(&mut rng)
             .unwrap()

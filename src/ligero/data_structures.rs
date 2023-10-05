@@ -4,7 +4,6 @@ use crate::{
 };
 use ark_crypto_primitives::crh::{CRHScheme, TwoToOneCRHScheme};
 use ark_crypto_primitives::merkle_tree::MerkleTree;
-use ark_crypto_primitives::sponge::Absorb;
 use ark_crypto_primitives::{
     merkle_tree::{Config, LeafParam, Path, TwoToOneParam},
     sponge::CryptographicSponge,
@@ -81,56 +80,9 @@ where
 
         MerkleTree::<C>::new(leaf_hash_params, two_to_one_params, col_hashes).unwrap()
     }
-}
 
-/// The univariate Ligero polynomial commitment scheme based on [[Ligero]][ligero].
-/// The scheme defaults to the naive batching strategy.
-///
-/// Note: The scheme currently does not support hiding.
-///
-/// [ligero]: https://eprint.iacr.org/2022/1608.pdf
-pub struct Ligero<
-    F: PrimeField,
-    C: Config,
-    D: Digest,
-    S: CryptographicSponge,
-    P: DenseUVPolynomial<F>,
-> {
-    _phantom: PhantomData<(F, C, D, S, P)>,
-}
-
-impl<F, C, D, S, P> LinearEncode<F, P, C, D> for Ligero<F, C, D, S, P>
-where
-    F: PrimeField,
-    C: Config,
-    D: Digest,
-    S: CryptographicSponge,
-    P: DenseUVPolynomial<F>,
-    Vec<u8>: Borrow<C::Leaf>,
-{
-    fn encode(msg: &[F], rho_inv: usize) -> Vec<F> {
-        reed_solomon(msg, rho_inv)
-    }
-}
-
-impl<F, C, D, S, P> Ligero<F, C, D, S, P>
-where
-    F: PrimeField,
-    C: Config,
-    Vec<u8>: Borrow<C::Leaf>,
-    C::InnerDigest: Absorb,
-    D: Digest,
-    S: CryptographicSponge,
-    P: DenseUVPolynomial<F>,
-{
-    /// Create a new instance of Ligero.
-    pub fn new() -> Self {
-        Self {
-            _phantom: PhantomData,
-        }
-    }
-
-    pub(crate) fn generate_proof(
+    /// Missing docs
+    fn generate_proof(
         sec_param: usize,
         rho_inv: usize,
         b: &[F],
@@ -172,6 +124,36 @@ where
             v,
             columns: queried_columns,
         })
+    }
+}
+
+/// The univariate Ligero polynomial commitment scheme based on [[Ligero]][ligero].
+/// The scheme defaults to the naive batching strategy.
+///
+/// Note: The scheme currently does not support hiding.
+///
+/// [ligero]: https://eprint.iacr.org/2022/1608.pdf
+pub struct Ligero<
+    F: PrimeField,
+    C: Config,
+    D: Digest,
+    S: CryptographicSponge,
+    P: DenseUVPolynomial<F>,
+> {
+    _phantom: PhantomData<(F, C, D, S, P)>,
+}
+
+impl<F, C, D, S, P> LinearEncode<F, P, C, D> for Ligero<F, C, D, S, P>
+where
+    F: PrimeField,
+    C: Config,
+    D: Digest,
+    S: CryptographicSponge,
+    P: DenseUVPolynomial<F>,
+    Vec<u8>: Borrow<C::Leaf>,
+{
+    fn encode(msg: &[F], rho_inv: usize) -> Vec<F> {
+        reed_solomon(msg, rho_inv)
     }
 }
 
@@ -413,7 +395,7 @@ impl PCRandomness for LigeroPCRandomness {
 /// Proof of an individual Ligero well-formedness check or opening
 #[derive(Derivative, CanonicalSerialize, CanonicalDeserialize)]
 #[derivative(Default(bound = ""), Clone(bound = ""), Debug(bound = ""))]
-pub(crate) struct LigeroPCProofSingle<F, C>
+pub struct LigeroPCProofSingle<F, C>
 where
     F: PrimeField,
     C: Config,

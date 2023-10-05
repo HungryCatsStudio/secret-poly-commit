@@ -32,8 +32,23 @@ mod tests;
 
 const FIELD_SIZE_ERROR: &str = "This field is not suitable for the proposed parameters";
 
-impl<F, P, S, C, D> PolynomialCommitment<F, P, S> for Ligero<F, C, D, S, P>
+/// Any linear-code-based commitment scheme.
+pub struct LinearCodePCS<L, F, P, S, C, D>
 where
+    F: PrimeField,
+    C: Config,
+    D: Digest,
+    S: CryptographicSponge,
+    P: DenseUVPolynomial<F>,
+    Vec<u8>: Borrow<C::Leaf>,
+    L: LinearEncode<F, P, C, D>,
+{
+    _phantom: PhantomData<(L, F, P, S, C, D)>,
+}
+
+impl<L, F, P, S, C, D> PolynomialCommitment<F, P, S> for LinearCodePCS<L, F, P, S, C, D>
+where
+    L: LinearEncode<F, P, C, D>,
     F: PrimeField,
     P: DenseUVPolynomial<F>,
     S: CryptographicSponge,
@@ -131,11 +146,11 @@ where
 
             // 1. Arrange the coefficients of the polynomial into a matrix,
             // and apply Reed-Solomon encoding to get `ext_mat`.
-            let (mat, ext_mat) = Self::compute_matrices(polynomial, ck.rho_inv);
+            let (mat, ext_mat) = L::compute_matrices(polynomial, ck.rho_inv);
 
             // 2. Create the Merkle tree from the hashes of each column.
             let col_tree =
-                Self::create_merkle_tree(&ext_mat, &ck.leaf_hash_params, &ck.two_to_one_params);
+                L::create_merkle_tree(&ext_mat, &ck.leaf_hash_params, &ck.two_to_one_params);
 
             // 3. Obtain the MT root and add it to the transcript.
             let root = col_tree.root();
@@ -207,11 +222,11 @@ where
 
             // 1. Arrange the coefficients of the polynomial into a matrix,
             // and apply Reed-Solomon encoding to get `ext_mat`.
-            let (mat, ext_mat) = Self::compute_matrices(polynomial, ck.rho_inv);
+            let (mat, ext_mat) = L::compute_matrices(polynomial, ck.rho_inv);
 
             // 2. Create the Merkle tree from the hashes of each column.
             let col_tree =
-                Self::create_merkle_tree(&ext_mat, &ck.leaf_hash_params, &ck.two_to_one_params);
+                L::create_merkle_tree(&ext_mat, &ck.leaf_hash_params, &ck.two_to_one_params);
 
             // 3. Generate vector `b = [1, z^m, z^(2m), ..., z^((m-1)m)]`
             let mut b = Vec::new();
@@ -254,7 +269,7 @@ where
 
             proof_array.push(LigeroPCProof {
                 // compute the opening proof and append b.M to the transcript
-                opening: Self::generate_proof(
+                opening: L::generate_proof(
                     ck.sec_param,
                     ck.rho_inv,
                     &b,

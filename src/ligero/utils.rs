@@ -191,7 +191,7 @@ macro_rules! to_bytes {
 /// their dependency on `crypto-primitive`, we use their crate instead of
 /// a copy-paste. We needed the newer `crypto-primitive` for serializing.
 #[derive(Clone)]
-pub(crate) struct IOPTranscript<F: PrimeField> {
+pub struct IOPTranscript<F: PrimeField> {
     transcript: Transcript,
     is_empty: bool,
     #[doc(hidden)]
