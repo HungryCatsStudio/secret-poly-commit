@@ -54,13 +54,9 @@ where
     fn tensor(
         point: &<P as Polynomial<F>>::Point,
         left_len: usize,
-        right_len: usize,
+        _right_len: usize,
     ) -> (Vec<F>, Vec<F>) {
         let point: Vec<F> = Self::point_to_vec(point.clone());
-        println!("len: {}", point.len());
-        println!("point: {:?}", point);
-        println!("left: {}", left_len);
-        println!("right: {}", right_len);
 
         let split = log2(left_len) as usize;
         let left = &point[..split];
