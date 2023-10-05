@@ -1,4 +1,5 @@
 use ark_crypto_primitives::crh::{CRHScheme, TwoToOneCRHScheme};
+use ark_crypto_primitives::merkle_tree::MerkleTree;
 use ark_crypto_primitives::{
     merkle_tree::Config,
     sponge::{Absorb, CryptographicSponge},
@@ -13,7 +14,7 @@ use ark_std::vec::Vec;
 
 use digest::Digest;
 
-use crate::ligero::utils::{inner_product, IOPTranscript};
+use crate::ligero::utils::*;
 use crate::{Error, LabeledCommitment, LabeledPolynomial, PCUniversalParams, PolynomialCommitment};
 
 mod utils;
@@ -28,12 +29,125 @@ mod data_structures;
 use data_structures::*;
 
 pub use data_structures::{
-    LigeroPCCommitterKey, LigeroPCProof, LigeroPCUniversalParams, LigeroPCVerifierKey, LinearEncode,
+    LigeroPCCommitterKey, LigeroPCProof, LigeroPCUniversalParams, LigeroPCVerifierKey,
 };
 
 use utils::{calculate_t, get_indices_from_transcript, hash_column};
 
 const FIELD_SIZE_ERROR: &str = "This field is not suitable for the proposed parameters";
+
+/// A trait for linear encoding a messsage.
+pub trait LinearEncode<F, P, C, D>
+where
+    F: PrimeField,
+    P: Polynomial<F>,
+    C: Config,
+    D: Digest,
+    Vec<u8>: Borrow<C::Leaf>,
+{
+    /// Encode a message, which is interpreted as a vector of coefficients
+    /// of a polynomial of degree m - 1.
+    fn encode(msg: &[F], rho_inv: usize) -> Vec<F>;
+
+    /// Get the representation of the polynomial
+    fn poly_repr(polynomial: &P) -> Vec<F>;
+
+    /// How we choose to split the query point into a Vec of Field elements.
+    /// Needed for appending to transcript.
+    fn point_to_vec(point: P::Point) -> Vec<F>;
+
+    /// Compute the matrices for the polynomial
+    fn compute_matrices(polynomial: &P, rho_inv: usize) -> (Matrix<F>, Matrix<F>) {
+        let mut coeffs = Self::poly_repr(polynomial);
+
+        // 1. Computing parameters and initial matrix
+        let (n_rows, n_cols) = compute_dimensions::<F>(coeffs.len()); // for 6 coefficients, this is returning 4 x 2 with a row of 0s: fix
+
+        // padding the coefficient vector with zeroes
+        // TODO is this the most efficient/safest way to do it?
+        coeffs.resize(n_rows * n_cols, F::zero());
+
+        let mat = Matrix::new_from_flat(n_rows, n_cols, &coeffs);
+
+        // 2. Apply Reed-Solomon encoding row-wise
+        let ext_mat = Matrix::new_from_rows(
+            mat.rows()
+                .iter()
+                .map(|r| Self::encode(r, rho_inv))
+                .collect(),
+        );
+
+        (mat, ext_mat)
+    }
+
+    /// TODO docs
+    fn create_merkle_tree(
+        ext_mat: &Matrix<F>,
+        leaf_hash_params: &<<C as Config>::LeafHash as CRHScheme>::Parameters,
+        two_to_one_params: &<<C as Config>::TwoToOneHash as TwoToOneCRHScheme>::Parameters,
+    ) -> MerkleTree<C> {
+        let mut col_hashes: Vec<Vec<u8>> = Vec::new();
+        let ext_mat_cols = ext_mat.cols();
+
+        for col in ext_mat_cols.iter() {
+            col_hashes.push(hash_column::<D, F>(col));
+        }
+
+        // pad the column hashes with zeroes
+        let next_pow_of_two = col_hashes.len().next_power_of_two();
+        col_hashes.resize(next_pow_of_two, vec![0; <D as Digest>::output_size()]);
+
+        MerkleTree::<C>::new(leaf_hash_params, two_to_one_params, col_hashes).unwrap()
+    }
+
+    /// Missing docs
+    fn generate_proof(
+        sec_param: usize,
+        rho_inv: usize,
+        b: &[F],
+        mat: &Matrix<F>,
+        ext_mat: &Matrix<F>,
+        col_tree: &MerkleTree<C>,
+        transcript: &mut IOPTranscript<F>,
+    ) -> Result<LigeroPCProofSingle<F, C>, Error> {
+        let t = calculate_t::<F>(sec_param, rho_inv, ext_mat.n)?;
+
+        // 1. left-multiply the matrix by `b`, where for a requested query point `z`,
+        // `b = [1, z^m, z^(2m), ..., z^((m-1)m)]`
+        let v = mat.row_mul(b);
+
+        transcript
+            .append_serializable_element(b"v", &v)
+            .map_err(|_| Error::TranscriptError)?;
+
+        // 2. Generate t column indices to test the linear combination on
+        let indices = get_indices_from_transcript(ext_mat.m, t, transcript)?;
+
+        // 3. Compute Merkle tree paths for the requested columns
+        let mut queried_columns = Vec::with_capacity(t);
+        let mut paths = Vec::with_capacity(t);
+
+        let ext_mat_cols = ext_mat.cols();
+
+        for i in indices {
+            queried_columns.push(ext_mat_cols[i].clone());
+            paths.push(
+                col_tree
+                    .generate_proof(i)
+                    .map_err(|_| Error::TranscriptError)?,
+            );
+        }
+
+        Ok(LigeroPCProofSingle {
+            paths,
+            v,
+            columns: queried_columns,
+        })
+    }
+
+    /// Tensor the point
+    fn tensor(point: &P::Point, left_len: usize, right_len: usize) -> (Vec<F>, Vec<F>);
+}
 
 /// Any linear-code-based commitment scheme.
 pub struct LinearCodePCS<L, F, P, S, C, D>
