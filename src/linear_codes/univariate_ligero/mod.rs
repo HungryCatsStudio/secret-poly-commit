@@ -1,3 +1,4 @@
+use ark_crypto_primitives::crh::{CRHScheme, TwoToOneCRHScheme};
 use ark_crypto_primitives::{merkle_tree::Config, sponge::CryptographicSponge};
 use ark_ff::PrimeField;
 use ark_poly::DenseUVPolynomial;
@@ -8,7 +9,7 @@ use ark_std::vec::Vec;
 use digest::Digest;
 
 use super::utils::reed_solomon;
-use super::LinearEncode;
+use super::{LigeroPCKey, LigeroPCUniversalParams, LinearEncode};
 
 mod tests;
 
@@ -38,8 +39,22 @@ where
     Vec<u8>: Borrow<C::Leaf>,
     P::Point: Into<F>,
 {
-    fn encode(msg: &[F], rho_inv: usize) -> Vec<F> {
-        reed_solomon(msg, rho_inv)
+    type LinCodeUniversalParams = LigeroPCUniversalParams<F, C>;
+    type LinCodePCKey = LigeroPCKey<F, C>;
+
+    fn setup(
+        leaf_hash_params: <<C as Config>::LeafHash as CRHScheme>::Parameters,
+        two_to_one_params: <<C as Config>::TwoToOneHash as TwoToOneCRHScheme>::Parameters,
+    ) -> Self::LinCodeUniversalParams {
+        Self::LinCodeUniversalParams::new(128, 4, true, leaf_hash_params, two_to_one_params)
+    }
+
+    fn trim(_pp: &Self::LinCodeUniversalParams) -> Self::LinCodePCKey {
+        todo!()
+    }
+
+    fn encode(msg: &[F], rho_inv: (usize, usize)) -> Vec<F> {
+        reed_solomon(msg, rho_inv.0)
     }
 
     /// For a univariate polynomial, we simply return the list of coefficients.ś
