@@ -194,22 +194,6 @@ where
             return Err(Error::InvalidParameters(FIELD_SIZE_ERROR.to_string()));
         }
         let k = L::trim(pp);
-        // let k = LigeroPCCommitterKey::<F, C> {
-        //     _field: PhantomData,
-        //     sec_param: pp.sec_param,
-        //     rho_inv: pp.rho_inv,
-        //     leaf_hash_params: pp.leaf_hash_params.clone(),
-        //     two_to_one_params: pp.two_to_one_params.clone(),
-        //     check_well_formedness: pp.check_well_formedness,
-        // };
-        // let k = LigeroPCVerifierKey::<F, C> {
-        //     _field: PhantomData,
-        //     sec_param: pp.sec_param,
-        //     rho_inv: pp.rho_inv,
-        //     leaf_hash_params: pp.leaf_hash_params.clone(),
-        //     two_to_one_params: pp.two_to_one_params.clone(),
-        //     check_well_formedness: pp.check_well_formedness,
-        // };
         Ok((k.clone(), k))
     }
 
