@@ -31,30 +31,30 @@ pub use univariate_ligero::UnivariateLigero;
 mod data_structures;
 use data_structures::*;
 
-pub use data_structures::{LigeroPCKey, LigeroPCUniversalParams, LinCodePCProof};
+pub use data_structures::{LigeroPCParams, LinCodePCProof};
 
 use utils::{calculate_t, get_indices_from_transcript, hash_column};
 
 const FIELD_SIZE_ERROR: &str = "This field is not suitable for the proposed parameters";
 
 /// This trait is another kir for this kiri interface
-pub trait HashInfo<C>
+pub trait LinCodeInfo<C>
 where
     C: Config,
 {
-    /// Kir Khar
+    /// Get security parameter
     fn sec_param(&self) -> usize;
 
-    /// Zahr mar
+    /// Get the inverse of code rate
     fn rho_inv(&self) -> (usize, usize);
 
-    /// Kose nanat
+    /// See whether there should be a well-formedness check
     fn check_well_formedness(&self) -> bool;
 
-    /// Ridam dahanet
+    /// Get LeafHash parameters
     fn leaf_hash_params(&self) -> &<<C as Config>::LeafHash as CRHScheme>::Parameters;
 
-    /// Kir
+    /// Get TwoToOneHash paramters
     fn two_to_one_params(&self) -> &<<C as Config>::TwoToOneHash as TwoToOneCRHScheme>::Parameters;
 }
 
@@ -67,22 +67,19 @@ where
     D: Digest,
     Vec<u8>: Borrow<C::Leaf>,
 {
-    /// Namoosan bikhial
-    type LinCodeUniversalParams: PCUniversalParams;
-    /// Namoosan bikhial 2
-    type LinCodePCKey: PCCommitterKey + PCVerifierKey + HashInfo<C>;
-    /// Some comment
+    /// For schemes like Breakdown and Ligero, PCCommiiterKey and
+    /// PCVerifierKey and PCUniversalParams are all the same.
+    type LinCodePCParams: PCUniversalParams + PCCommitterKey + PCVerifierKey + LinCodeInfo<C>;
+
+    /// Does a default setup for the PCS.
     fn setup(
         leaf_hash_params: <<C as Config>::LeafHash as CRHScheme>::Parameters,
         two_to_one_params: <<C as Config>::TwoToOneHash as TwoToOneCRHScheme>::Parameters,
-    ) -> Self::LinCodeUniversalParams;
-
-    /// Some other comment
-    fn trim(pp: &Self::LinCodeUniversalParams) -> Self::LinCodePCKey;
+    ) -> Self::LinCodePCParams;
 
     /// Encode a message, which is interpreted as a vector of coefficients
     /// of a polynomial of degree m - 1.
-    fn encode(msg: &[F], rho_inv: (usize, usize)) -> Vec<F>;
+    fn encode(msg: &[F], param: &Self::LinCodePCParams) -> Vec<F>;
 
     /// Get the representation of the polynomial
     fn poly_repr(polynomial: &P) -> Vec<F>;
@@ -92,7 +89,7 @@ where
     fn point_to_vec(point: P::Point) -> Vec<F>;
 
     /// Compute the matrices for the polynomial
-    fn compute_matrices(polynomial: &P, rho_inv: (usize, usize)) -> (Matrix<F>, Matrix<F>) {
+    fn compute_matrices(polynomial: &P, param: &Self::LinCodePCParams) -> (Matrix<F>, Matrix<F>) {
         let mut coeffs = Self::poly_repr(polynomial);
 
         // 1. Computing parameters and initial matrix
@@ -105,12 +102,8 @@ where
         let mat = Matrix::new_from_flat(n_rows, n_cols, &coeffs);
 
         // 2. Apply Reed-Solomon encoding row-wise
-        let ext_mat = Matrix::new_from_rows(
-            mat.rows()
-                .iter()
-                .map(|r| Self::encode(r, rho_inv))
-                .collect(),
-        );
+        let ext_mat =
+            Matrix::new_from_rows(mat.rows().iter().map(|r| Self::encode(r, param)).collect());
 
         (mat, ext_mat)
     }
@@ -144,11 +137,11 @@ where
     C::InnerDigest: Absorb,
     D: Digest,
 {
-    type UniversalParams = L::LinCodeUniversalParams;
+    type UniversalParams = L::LinCodePCParams;
 
-    type CommitterKey = L::LinCodePCKey;
+    type CommitterKey = L::LinCodePCParams;
 
-    type VerifierKey = L::LinCodePCKey;
+    type VerifierKey = L::LinCodePCParams;
 
     type PreparedVerifierKey = LinCodePCPreparedVerifierKey;
 
@@ -177,7 +170,7 @@ where
             .unwrap()
             .clone();
         let pp = L::setup(leaf_hash_params, two_to_one_params);
-        let real_max_degree = pp.max_degree();
+        let real_max_degree = <Self::UniversalParams as PCUniversalParams>::max_degree(&pp);
         if max_degree > real_max_degree || real_max_degree == 0 {
             return Err(Error::InvalidParameters(FIELD_SIZE_ERROR.to_string()));
         }
@@ -190,11 +183,10 @@ where
         _supported_hiding_bound: usize,
         _enforced_degree_bounds: Option<&[usize]>,
     ) -> Result<(Self::CommitterKey, Self::VerifierKey), Self::Error> {
-        if pp.max_degree() == 0 {
+        if <Self::UniversalParams as PCUniversalParams>::max_degree(pp) == 0 {
             return Err(Error::InvalidParameters(FIELD_SIZE_ERROR.to_string()));
         }
-        let k = L::trim(pp);
-        Ok((k.clone(), k))
+        Ok((pp.clone(), pp.clone()))
     }
 
     fn commit<'a>(
@@ -218,7 +210,7 @@ where
 
             // 1. Arrange the coefficients of the polynomial into a matrix,
             // and apply Reed-Solomon encoding to get `ext_mat`.
-            let (mat, ext_mat) = L::compute_matrices(polynomial, ck.rho_inv());
+            let (mat, ext_mat) = L::compute_matrices(polynomial, ck);
 
             // 2. Create the Merkle tree from the hashes of each column.
             let col_tree = create_merkle_tree::<F, C, D>(
@@ -297,7 +289,7 @@ where
 
             // 1. Arrange the coefficients of the polynomial into a matrix,
             // and apply Reed-Solomon encoding to get `ext_mat`.
-            let (mat, ext_mat) = L::compute_matrices(polynomial, ck.rho_inv());
+            let (mat, ext_mat) = L::compute_matrices(polynomial, ck);
 
             // 2. Create the Merkle tree from the hashes of each column.
             let col_tree = create_merkle_tree::<F, C, D>(
@@ -474,7 +466,7 @@ where
             };
 
             // 5. Compute the encoding w = E(v)
-            let w = L::encode(&proof_array[i].opening.v, vk.rho_inv());
+            let w = L::encode(&proof_array[i].opening.v, vk);
 
             // 6. Compute a = [1, z, z^2, ..., z^(n_cols_1)]
             // where z denotes the query `point`.
@@ -487,7 +479,7 @@ where
             // matches with what the verifier computed for himself.
             // Note: we sacrifice some code repetition in order not to repeat execution.
             if let (Some(well_formedness), Some(r)) = out {
-                let w_well_formedness = L::encode(well_formedness, vk.rho_inv());
+                let w_well_formedness = L::encode(well_formedness, vk);
                 for (transcript_index, matrix_index) in indices.iter().enumerate() {
                     check_inner_product(
                         &r,

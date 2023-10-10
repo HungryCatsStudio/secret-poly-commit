@@ -9,7 +9,7 @@ use ark_std::vec::Vec;
 use digest::Digest;
 
 use super::utils::reed_solomon;
-use super::{LigeroPCKey, LigeroPCUniversalParams, LinearEncode};
+use super::{LigeroPCParams, LinCodeInfo, LinearEncode};
 
 mod tests;
 
@@ -39,29 +39,17 @@ where
     Vec<u8>: Borrow<C::Leaf>,
     P::Point: Into<F>,
 {
-    type LinCodeUniversalParams = LigeroPCUniversalParams<F, C>;
-    type LinCodePCKey = LigeroPCKey<F, C>;
+    type LinCodePCParams = LigeroPCParams<F, C>;
 
     fn setup(
         leaf_hash_params: <<C as Config>::LeafHash as CRHScheme>::Parameters,
         two_to_one_params: <<C as Config>::TwoToOneHash as TwoToOneCRHScheme>::Parameters,
-    ) -> Self::LinCodeUniversalParams {
-        Self::LinCodeUniversalParams::new(128, 4, true, leaf_hash_params, two_to_one_params)
+    ) -> Self::LinCodePCParams {
+        Self::LinCodePCParams::new(128, 4, true, leaf_hash_params, two_to_one_params)
     }
 
-    fn trim(pp: &Self::LinCodeUniversalParams) -> Self::LinCodePCKey {
-        Self::LinCodePCKey {
-            _field: PhantomData,
-            sec_param: pp.sec_param,
-            rho_inv: pp.rho_inv,
-            leaf_hash_params: pp.leaf_hash_params.clone(),
-            two_to_one_params: pp.two_to_one_params.clone(),
-            check_well_formedness: pp.check_well_formedness,
-        }
-    }
-
-    fn encode(msg: &[F], rho_inv: (usize, usize)) -> Vec<F> {
-        reed_solomon(msg, rho_inv.0)
+    fn encode(msg: &[F], param: &Self::LinCodePCParams) -> Vec<F> {
+        reed_solomon(msg, param.rho_inv().0)
     }
 
     /// For a univariate polynomial, we simply return the list of coefficients.ś
