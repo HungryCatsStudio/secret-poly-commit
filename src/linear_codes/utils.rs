@@ -1,12 +1,9 @@
+use ark_crypto_primitives::sponge::poseidon::PoseidonConfig;
 use ark_ff::{FftField, Field, PrimeField};
 
 use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
-use ark_serialize::CanonicalSerialize;
-use ark_std::marker::PhantomData;
-use ark_std::string::ToString;
 use ark_std::vec::Vec;
-use digest::Digest;
-use merlin::Transcript;
+use ark_std::{string::ToString, test_rng};
 #[cfg(not(feature = "std"))]
 use num_traits::Float;
 #[cfg(feature = "parallel")]
@@ -178,11 +175,8 @@ pub(crate) fn get_num_bytes(n: usize) -> usize {
 // TODO: replace by https://github.com/arkworks-rs/crypto-primitives/issues/112.
 #[cfg(test)]
 use ark_crypto_primitives::sponge::poseidon::PoseidonSponge;
-#[cfg(test)]
-pub(crate) fn test_sponge<F: PrimeField>() -> PoseidonSponge<F> {
-    use ark_crypto_primitives::sponge::{poseidon::PoseidonConfig, CryptographicSponge};
-    use ark_std::test_rng;
 
+pub(crate) fn poseidon_parameters_for_test<F: PrimeField>() -> PoseidonConfig<F> {
     let full_rounds = 8;
     let partial_rounds = 31;
     let alpha = 17;
@@ -193,7 +187,7 @@ pub(crate) fn test_sponge<F: PrimeField>() -> PoseidonSponge<F> {
         vec![F::zero(), F::one(), F::one()],
     ];
 
-    let mut v = Vec::new();
+    let mut ark = Vec::new();
     let mut ark_rng = test_rng();
 
     for _ in 0..(full_rounds + partial_rounds) {
@@ -202,10 +196,17 @@ pub(crate) fn test_sponge<F: PrimeField>() -> PoseidonSponge<F> {
         for _ in 0..3 {
             res.push(F::rand(&mut ark_rng));
         }
-        v.push(res);
+        ark.push(res);
     }
-    let config = PoseidonConfig::new(full_rounds, partial_rounds, alpha, mds, v, 2, 1);
-    PoseidonSponge::new(&config)
+    PoseidonConfig::new(full_rounds, partial_rounds, alpha, mds, ark, 2, 1)
+}
+
+use super::transcript::IOPTranscript;
+#[cfg(test)]
+pub(crate) fn test_sponge<F: PrimeField>() -> PoseidonSponge<F> {
+    use ark_crypto_primitives::sponge::CryptographicSponge;
+
+    PoseidonSponge::new(&poseidon_parameters_for_test())
 }
 
 /// Takes as input a struct, and converts them to a series of bytes. All traits
@@ -220,113 +221,25 @@ macro_rules! to_bytes {
     }};
 }
 
-/// The following struct is taken from jellyfish repository. Once they change
-/// their dependency on `crypto-primitive`, we use their crate instead of
-/// a copy-paste. We needed the newer `crypto-primitive` for serializing.
-#[derive(Clone)]
-pub(crate) struct IOPTranscript<F: PrimeField> {
-    transcript: Transcript,
-    is_empty: bool,
-    #[doc(hidden)]
-    phantom: PhantomData<F>,
-}
-
-// TODO: merge this with jf_plonk::transcript
-impl<F: PrimeField> IOPTranscript<F> {
-    /// Create a new IOP transcript.
-    pub(crate) fn new(label: &'static [u8]) -> Self {
-        Self {
-            transcript: Transcript::new(label),
-            is_empty: true,
-            phantom: PhantomData,
-        }
-    }
-
-    /// Append the message to the transcript.
-    pub(crate) fn append_message(&mut self, label: &'static [u8], msg: &[u8]) -> Result<(), Error> {
-        self.transcript.append_message(label, msg);
-        self.is_empty = false;
-        Ok(())
-    }
-
-    /// Append the message to the transcript.
-    pub(crate) fn append_serializable_element<S: CanonicalSerialize>(
-        &mut self,
-        label: &'static [u8],
-        group_elem: &S,
-    ) -> Result<(), Error> {
-        self.append_message(
-            label,
-            &to_bytes!(group_elem).map_err(|_| Error::TranscriptError)?,
-        )
-    }
-
-    /// Generate the challenge from the current transcript
-    /// and append it to the transcript.
-    ///
-    /// The output field element is statistical uniform as long
-    /// as the field has a size less than 2^384.
-    pub(crate) fn get_and_append_challenge(&mut self, label: &'static [u8]) -> Result<F, Error> {
-        //  we need to reject when transcript is empty
-        if self.is_empty {
-            return Err(Error::TranscriptError);
-        }
-
-        let mut buf = [0u8; 64];
-        self.transcript.challenge_bytes(label, &mut buf);
-        let challenge = F::from_le_bytes_mod_order(&buf);
-        self.append_serializable_element(label, &challenge)?;
-        Ok(challenge)
-    }
-
-    /// Generate the challenge from the current transcript
-    /// and append it to the transcript.
-    ///
-    /// Without exposing the internal field `transcript`,
-    /// this is a wrapper around getting bytes as opposed to field elements.
-    pub(crate) fn get_and_append_byte_challenge(
-        &mut self,
-        label: &'static [u8],
-        dest: &mut [u8],
-    ) -> Result<(), Error> {
-        //  we need to reject when transcript is empty
-        if self.is_empty {
-            return Err(Error::TranscriptError);
-        }
-
-        self.transcript.challenge_bytes(label, dest);
-        self.append_message(label, dest)?;
-        Ok(())
-    }
-}
-
-#[inline]
-pub(crate) fn hash_column<D: Digest, F: PrimeField + CanonicalSerialize>(array: &[F]) -> Vec<u8> {
-    let mut dig = D::new();
-    for elem in array {
-        dig.update(to_bytes!(elem).unwrap());
-    }
-    dig.finalize().to_vec()
-}
-
 /// Generate `t` (not necessarily distinct) random points in `[0, n)` using the current state of `transcript`
 pub(crate) fn get_indices_from_transcript<F: PrimeField>(
     n: usize,
     t: usize,
     transcript: &mut IOPTranscript<F>,
 ) -> Result<Vec<usize>, Error> {
-    let bytes_to_squeeze = get_num_bytes(n);
     let mut indices = Vec::with_capacity(t);
-    for _ in 0..t {
-        let mut bytes: Vec<u8> = vec![0; bytes_to_squeeze];
-        transcript
-            .get_and_append_byte_challenge(b"i", &mut bytes)
-            .map_err(|_| Error::TranscriptError)?;
-
+    let bits = transcript
+        .get_and_append_byte_challenge(b"i", n, t)
+        .map_err(|_| Error::TranscriptError)?;
+    for i in 0..t {
         // get the usize from Vec<u8>:
-        let ind = bytes.iter().fold(0, |acc, &x| (acc << 8) + x as usize);
-        // modulo the number of columns in the encoded matrix
-        indices.push(ind % n);
+        println!("bits[i]: {:?}", bits[i]);
+        let ind = bits[i]
+            .iter()
+            .rev()
+            .fold(0, |acc, &x| (acc << 1) + x as usize);
+        println!("ind: {}", ind);
+        indices.push(ind);
     }
     Ok(indices)
 }
