@@ -366,7 +366,7 @@ pub(crate) fn calculate_t<F: PrimeField>(
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
 
     use ark_bls12_377::Fr;
     use ark_poly::{
@@ -374,9 +374,66 @@ mod tests {
         Polynomial,
     };
     use ark_std::test_rng;
-    use rand_chacha::{rand_core::SeedableRng, ChaCha20Rng};
+    use digest::Digest;
+    use rand_chacha::{
+        rand_core::{RngCore, SeedableRng},
+        ChaCha20Rng,
+    };
 
     use super::*;
+
+    // Define some shared testing hashers for univariate & multilinear ligero.
+    pub(crate) struct LeafIdentityHasher;
+
+    impl CRHScheme for LeafIdentityHasher {
+        type Input = Vec<u8>;
+        type Output = Vec<u8>;
+        type Parameters = ();
+
+        fn setup<R: RngCore>(_: &mut R) -> Result<Self::Parameters, ark_crypto_primitives::Error> {
+            Ok(())
+        }
+
+        fn evaluate<T: Borrow<Self::Input>>(
+            _: &Self::Parameters,
+            input: T,
+        ) -> Result<Self::Output, ark_crypto_primitives::Error> {
+            Ok(input.borrow().to_vec().into())
+        }
+    }
+
+    pub(crate) struct FieldToBytesColHasher<F, D>
+    where
+        F: PrimeField + CanonicalSerialize,
+        D: Digest,
+    {
+        _phantom: PhantomData<(F, D)>,
+    }
+
+    impl<F, D> CRHScheme for FieldToBytesColHasher<F, D>
+    where
+        F: PrimeField + CanonicalSerialize,
+        D: Digest,
+    {
+        type Input = Vec<F>;
+        type Output = Vec<u8>;
+        type Parameters = ();
+
+        fn setup<R: RngCore>(
+            _rng: &mut R,
+        ) -> Result<Self::Parameters, ark_crypto_primitives::Error> {
+            Ok(())
+        }
+
+        fn evaluate<T: Borrow<Self::Input>>(
+            _parameters: &Self::Parameters,
+            input: T,
+        ) -> Result<Self::Output, ark_crypto_primitives::Error> {
+            let mut dig = D::new();
+            dig.update(to_bytes!(input.borrow()).unwrap());
+            Ok(dig.finalize().to_vec())
+        }
+    }
 
     #[test]
     fn test_matrix_constructor_flat() {

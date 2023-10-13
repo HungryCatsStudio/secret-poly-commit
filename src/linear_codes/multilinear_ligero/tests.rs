@@ -1,12 +1,7 @@
 #[cfg(test)]
 mod tests {
 
-    use core::borrow::Borrow;
-    use core::marker::PhantomData;
-
     use crate::linear_codes::LinearCodePCS;
-    use crate::to_bytes;
-    use crate::RngCore;
     use crate::{
         challenge::ChallengeGenerator,
         linear_codes::{utils::*, LigeroPCParams, MultilinearLigero, PolynomialCommitment},
@@ -15,7 +10,6 @@ mod tests {
     use ark_bls12_377::Fq;
     use ark_bls12_377::Fr;
     use ark_bls12_381::Fr as Fr381;
-    use ark_crypto_primitives::Error;
     use ark_crypto_primitives::{
         crh::{sha256::Sha256, CRHScheme, TwoToOneCRHScheme},
         merkle_tree::{ByteDigestConverter, Config},
@@ -23,67 +17,15 @@ mod tests {
     };
     use ark_ff::{Field, PrimeField};
     use ark_poly::evaluations::multivariate::{MultilinearExtension, SparseMultilinearExtension};
-    use ark_serialize::CanonicalSerialize;
     use ark_std::test_rng;
     use blake2::Blake2s256;
-    use digest::Digest;
     use rand_chacha::{rand_core::SeedableRng, ChaCha20Rng};
 
-    type LeafH = LeafIdentityHasher;
+    type LeafH = crate::linear_codes::utils::tests::LeafIdentityHasher;
     type CompressH = Sha256;
-    type ColHasher<F, D> = FieldToBytesColHasher<F, D>;
+    type ColHasher<F, D> = crate::linear_codes::utils::tests::FieldToBytesColHasher<F, D>;
 
-    struct FieldToBytesColHasher<F, D>
-    where
-        F: PrimeField + CanonicalSerialize,
-        D: Digest,
-    {
-        _phantom: PhantomData<(F, D)>,
-    }
-
-    impl<F, D> CRHScheme for FieldToBytesColHasher<F, D>
-    where
-        F: PrimeField + CanonicalSerialize,
-        D: Digest,
-    {
-        type Input = Vec<F>;
-        type Output = Vec<u8>;
-        type Parameters = ();
-
-        fn setup<R: RngCore>(_rng: &mut R) -> Result<Self::Parameters, Error> {
-            Ok(())
-        }
-
-        fn evaluate<T: Borrow<Self::Input>>(
-            _parameters: &Self::Parameters,
-            input: T,
-        ) -> Result<Self::Output, Error> {
-            let mut dig = D::new();
-            dig.update(to_bytes!(input.borrow()).unwrap());
-            Ok(dig.finalize().to_vec())
-        }
-    }
-
-    struct LeafIdentityHasher;
-
-    impl CRHScheme for LeafIdentityHasher {
-        type Input = Vec<u8>;
-        type Output = Vec<u8>;
-        type Parameters = ();
-
-        fn setup<R: RngCore>(_: &mut R) -> Result<Self::Parameters, Error> {
-            Ok(())
-        }
-
-        fn evaluate<T: Borrow<Self::Input>>(
-            _: &Self::Parameters,
-            input: T,
-        ) -> Result<Self::Output, Error> {
-            Ok(input.borrow().to_vec().into())
-        }
-    }
-
-    struct MerkleTreeParams; //<F, D>(PhantomData<(F, D)>);
+    struct MerkleTreeParams;
 
     impl Config for MerkleTreeParams {
         type Leaf = Vec<u8>;
@@ -96,7 +38,7 @@ mod tests {
         type TwoToOneHash = CompressH;
     }
 
-    type MTConfig = MerkleTreeParams; //<F, Blake2s256>;
+    type MTConfig = MerkleTreeParams;
     type Sponge<F> = PoseidonSponge<F>;
 
     type LigeroPCS<F> = LinearCodePCS<

@@ -4,7 +4,6 @@ use ark_crypto_primitives::crh::{CRHScheme, TwoToOneCRHScheme};
 use ark_crypto_primitives::{merkle_tree::Config, sponge::CryptographicSponge};
 use ark_ff::{FftField, PrimeField};
 use ark_poly::{MultilinearExtension, Polynomial};
-use ark_std::borrow::Borrow;
 use ark_std::log2;
 use ark_std::marker::PhantomData;
 use ark_std::vec::Vec;
@@ -40,7 +39,6 @@ where
     D: Digest,
     S: CryptographicSponge,
     P: MultilinearExtension<F>,
-    Vec<u8>: Borrow<C::Leaf>,
     <P as Polynomial<F>>::Point: Into<Vec<F>>,
     H: CRHScheme,
 {
