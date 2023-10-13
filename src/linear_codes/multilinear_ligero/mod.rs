@@ -2,7 +2,7 @@ use core::usize;
 
 use ark_crypto_primitives::crh::{CRHScheme, TwoToOneCRHScheme};
 use ark_crypto_primitives::{merkle_tree::Config, sponge::CryptographicSponge};
-use ark_ff::PrimeField;
+use ark_ff::{FftField, PrimeField};
 use ark_poly::{MultilinearExtension, Polynomial};
 use ark_std::borrow::Borrow;
 use ark_std::log2;
@@ -28,27 +28,37 @@ pub struct MultilinearLigero<
     D: Digest,
     S: CryptographicSponge,
     P: MultilinearExtension<F>,
+    H: CRHScheme,
 > {
-    _phantom: PhantomData<(F, C, D, S, P)>,
+    _phantom: PhantomData<(F, C, D, S, P, H)>,
 }
 
-impl<F, C, D, S, P> LinearEncode<F, P, C, D> for MultilinearLigero<F, C, D, S, P>
+impl<F, C, D, S, P, H> LinearEncode<F, P, C, D, H> for MultilinearLigero<F, C, D, S, P, H>
 where
-    F: PrimeField,
+    F: PrimeField + FftField,
     C: Config,
     D: Digest,
     S: CryptographicSponge,
     P: MultilinearExtension<F>,
     Vec<u8>: Borrow<C::Leaf>,
     <P as Polynomial<F>>::Point: Into<Vec<F>>,
+    H: CRHScheme,
 {
-    type LinCodePCParams = LigeroPCParams<F, C>;
+    type LinCodePCParams = LigeroPCParams<F, C, H>;
 
     fn setup(
         leaf_hash_params: <<C as Config>::LeafHash as CRHScheme>::Parameters,
         two_to_one_params: <<C as Config>::TwoToOneHash as TwoToOneCRHScheme>::Parameters,
+        col_hash_params: H::Parameters,
     ) -> Self::LinCodePCParams {
-        Self::LinCodePCParams::new(128, 4, true, leaf_hash_params, two_to_one_params)
+        Self::LinCodePCParams::new(
+            128,
+            4,
+            true,
+            leaf_hash_params,
+            two_to_one_params,
+            col_hash_params,
+        )
     }
 
     fn encode(msg: &[F], param: &Self::LinCodePCParams) -> Vec<F> {
