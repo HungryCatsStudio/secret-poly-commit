@@ -10,7 +10,6 @@ use ark_poly::{MultilinearExtension, Polynomial};
 use ark_std::log2;
 use ark_std::marker::PhantomData;
 use ark_std::vec::Vec;
-use digest::Digest;
 
 mod tests;
 
@@ -23,19 +22,17 @@ mod tests;
 pub struct MultilinearLigero<
     F: PrimeField,
     C: Config,
-    D: Digest,
     S: CryptographicSponge,
     P: MultilinearExtension<F>,
     H: CRHScheme,
 > {
-    _phantom: PhantomData<(F, C, D, S, P, H)>,
+    _phantom: PhantomData<(F, C, S, P, H)>,
 }
 
-impl<F, C, D, S, P, H> LinearEncode<F, C, D, P, H> for MultilinearLigero<F, C, D, S, P, H>
+impl<F, C, S, P, H> LinearEncode<F, C, P, H> for MultilinearLigero<F, C, S, P, H>
 where
     F: PrimeField + FftField,
     C: Config,
-    D: Digest,
     S: CryptographicSponge,
     P: MultilinearExtension<F>,
     <P as Polynomial<F>>::Point: Into<Vec<F>>,

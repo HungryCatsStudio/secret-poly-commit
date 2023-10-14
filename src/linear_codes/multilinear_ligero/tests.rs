@@ -45,7 +45,6 @@ mod tests {
         MultilinearLigero<
             F,
             MTConfig,
-            Blake2s256,
             Sponge<F>,
             SparseMultilinearExtension<F>,
             ColHasher<F, Blake2s256>,
@@ -54,7 +53,6 @@ mod tests {
         SparseMultilinearExtension<F>,
         Sponge<F>,
         MTConfig,
-        Blake2s256,
         ColHasher<F, Blake2s256>,
     >;
 

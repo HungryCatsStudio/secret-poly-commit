@@ -15,7 +15,6 @@ use ark_std::marker::PhantomData;
 use ark_std::rand::RngCore;
 use ark_std::string::ToString;
 use ark_std::vec::Vec;
-use digest::Digest;
 #[cfg(not(feature = "std"))]
 use num_traits::Float;
 
@@ -63,11 +62,10 @@ where
 }
 
 /// A trait for linear encoding a messsage.
-pub trait LinearEncode<F, C, D, P, H>
+pub trait LinearEncode<F, C, P, H>
 where
     F: PrimeField,
     C: Config,
-    D: Digest,
     H: CRHScheme,
     P: Polynomial<F>,
 {
@@ -136,22 +134,21 @@ where
 }
 
 /// Any linear-code-based commitment scheme.
-pub struct LinearCodePCS<L, F, P, S, C, D, H>
+pub struct LinearCodePCS<L, F, P, S, C, H>
 where
     F: PrimeField,
     C: Config,
-    D: Digest,
     S: CryptographicSponge,
     P: Polynomial<F>,
     H: CRHScheme,
-    L: LinearEncode<F, C, D, P, H>,
+    L: LinearEncode<F, C, P, H>,
 {
-    _phantom: PhantomData<(L, F, P, S, C, D, H)>,
+    _phantom: PhantomData<(L, F, P, S, C, H)>,
 }
 
-impl<L, F, P, S, C, D, H> PolynomialCommitment<F, P, S> for LinearCodePCS<L, F, P, S, C, D, H>
+impl<L, F, P, S, C, H> PolynomialCommitment<F, P, S> for LinearCodePCS<L, F, P, S, C, H>
 where
-    L: LinearEncode<F, C, D, P, H>,
+    L: LinearEncode<F, C, P, H>,
     F: PrimeField,
     P: Polynomial<F>,
     S: CryptographicSponge,
@@ -159,7 +156,6 @@ where
     Vec<F>: Borrow<<H as CRHScheme>::Input>,
     H::Output: Into<C::Leaf>,
     C::Leaf: Sized + Clone + Default,
-    D: Digest,
     H: CRHScheme,
 {
     type UniversalParams = L::LinCodePCParams;

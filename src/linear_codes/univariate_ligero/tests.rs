@@ -43,36 +43,20 @@ mod tests {
     type Sponge = PoseidonSponge<Fr>;
 
     type LigeroPCS = LinearCodePCS<
-        UnivariateLigero<
-            Fr,
-            MTConfig,
-            Blake2s256,
-            Sponge,
-            DensePolynomial<Fr>,
-            ColHasher<Fr, Blake2s256>,
-        >,
+        UnivariateLigero<Fr, MTConfig, Sponge, DensePolynomial<Fr>, ColHasher<Fr, Blake2s256>>,
         Fr,
         DensePolynomial<Fr>,
         Sponge,
         MTConfig,
-        Blake2s256,
         ColHasher<Fr, Blake2s256>,
     >;
 
     type LigeroPcsF<F> = LinearCodePCS<
-        UnivariateLigero<
-            F,
-            MTConfig,
-            Blake2s256,
-            Sponge,
-            DensePolynomial<F>,
-            ColHasher<F, Blake2s256>,
-        >,
+        UnivariateLigero<F, MTConfig, Sponge, DensePolynomial<F>, ColHasher<F, Blake2s256>>,
         F,
         DensePolynomial<F>,
         Sponge,
         MTConfig,
-        Blake2s256,
         ColHasher<F, Blake2s256>,
     >;
 

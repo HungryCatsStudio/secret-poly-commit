@@ -7,7 +7,6 @@ use ark_ff::PrimeField;
 use ark_poly::DenseUVPolynomial;
 use ark_std::marker::PhantomData;
 use ark_std::vec::Vec;
-use digest::Digest;
 
 mod tests;
 
@@ -20,19 +19,17 @@ mod tests;
 pub struct UnivariateLigero<
     F: PrimeField,
     C: Config,
-    D: Digest,
     S: CryptographicSponge,
     P: DenseUVPolynomial<F>,
     H: CRHScheme,
 > {
-    _phantom: PhantomData<(F, C, D, S, P, H)>,
+    _phantom: PhantomData<(F, C, S, P, H)>,
 }
 
-impl<F, C, D, S, P, H> LinearEncode<F, C, D, P, H> for UnivariateLigero<F, C, D, S, P, H>
+impl<F, C, S, P, H> LinearEncode<F, C, P, H> for UnivariateLigero<F, C, S, P, H>
 where
     F: PrimeField,
     C: Config,
-    D: Digest,
     S: CryptographicSponge,
     P: DenseUVPolynomial<F>,
     P::Point: Into<F>,
