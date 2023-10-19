@@ -11,7 +11,7 @@ use ark_crypto_primitives::{
 };
 
 use ark_poly_commit::{
-    bench_templates::{bench_pcs_method, commit, open, verify, MLE},
+    bench_templates::{bench_pcs_method, commit, open, verify, MLE, bench_two_pcs_methods_together},
     hyrax::HyraxPC,
     linear_codes::{FieldToBytesColHasher, LeafIdentityHasher, LinearCodePCS, MultilinearLigero},
 };
@@ -139,6 +139,33 @@ fn ligero_bn254(c: &mut Criterion) {
     );
 }
 
+fn ligero_bn254_vs_hyrax_b254(c: &mut Criterion) {
+    bench_two_pcs_methods_together::<_, Ligero<Fr254>, _, Hyrax<G1Affine254>>(
+        c,
+        (MIN_NUM_VARS..MAX_NUM_VARS).step_by(2).collect(),
+        "commit_ligero_BN_254",
+        commit::<_, Ligero<Fr254>>,
+        "commit_hyrax_BN_254",
+        commit::<_, Hyrax<G1Affine254>>,
+    );
+    bench_two_pcs_methods_together::<_, Ligero<Fr254>, _, Hyrax<G1Affine254>>(
+        c,
+        (MIN_NUM_VARS..MAX_NUM_VARS).step_by(2).collect(),
+        "open_ligero_BN_254",
+        open::<_, Ligero<Fr254>>,
+        "open_hyrax_BN_254",
+        open::<_, Hyrax<G1Affine254>>,
+    );
+    bench_two_pcs_methods_together::<_, Ligero<Fr254>, _, Hyrax<G1Affine254>>(
+        c,
+        (MIN_NUM_VARS..MAX_NUM_VARS).step_by(2).collect(),
+        "verify_ligero_BN_254",
+        verify::<_, Ligero<Fr254>>,
+        "verify_hyrax_BN_254",
+        verify::<_, Hyrax<G1Affine254>>,
+    );
+}
+
 criterion_group! {
     name = hyrax_benches;
     config = Criterion::default();
@@ -155,4 +182,10 @@ criterion_group! {
         ligero_bn254
 }
 
-criterion_main!(hyrax_benches, ligero_benches);
+criterion_group! {
+    name = ligero_vs_hyrax_benches;
+    config = Criterion::default();
+    targets = ligero_bn254_vs_hyrax_b254
+}
+
+criterion_main!(ligero_vs_hyrax_benches);

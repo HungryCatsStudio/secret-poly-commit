@@ -49,6 +49,54 @@ pub fn bench_pcs_method<
     group.finish();
 }
 
+/// Measure the time cost of {commit/open/verify} across a range of num_vars
+/// pitching two PCS methods against each other
+pub fn bench_two_pcs_methods_together<
+    F1: PrimeField,
+    PCS1: PolynomialCommitment<F1, DenseMultilinearExtension<F1>, PoseidonSponge<F1>>,
+    F2: PrimeField,
+    PCS2: PolynomialCommitment<F2, DenseMultilinearExtension<F2>, PoseidonSponge<F2>>,
+>(
+    c: &mut Criterion,
+    range: Vec<usize>,
+    name1: &str,
+    method1: impl Fn(&PCS1::UniversalParams, usize) -> Duration,
+    name2: &str,
+    method2: impl Fn(&PCS2::UniversalParams, usize) -> Duration,
+) {
+    let mut group = c.benchmark_group(format!("{} vs {}", name1, name2));
+    let rng = &mut test_rng();
+
+    // Add for logarithmic scale (should yield linear plots)
+    // let plot_config = PlotConfiguration::default().summary_scale(AxisScale::Logarithmic);
+    // group.plot_config(plot_config);
+
+    for num_vars in range {
+        // TODO if this takes too long and key trimming works, we might want to pull this out from the loop
+        let pp1 = PCS1::setup(1, Some(num_vars), rng).unwrap();
+
+        group.bench_with_input(
+            BenchmarkId::new(name1, num_vars),
+            &num_vars,
+            |b, num_vars| {
+                b.iter(|| method1(&pp1, *num_vars));
+            },
+        );
+
+        let pp2 = PCS2::setup(1, Some(num_vars), rng).unwrap();
+
+        group.bench_with_input(
+            BenchmarkId::new(name2, num_vars),
+            &num_vars,
+            |b, num_vars| {
+                b.iter(|| method2(&pp2, *num_vars));
+            },
+        );
+    }
+
+    group.finish();
+}
+
 /// Report the time cost of a commitment
 pub fn commit<
     F: PrimeField,
