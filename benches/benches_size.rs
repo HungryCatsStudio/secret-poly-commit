@@ -60,7 +60,7 @@ type Brakedown<F> = LinearCodePCS<
 fn main() {
 
     println!("\nHyrax on BN-254: Proof size");
-    for num_vars in (MIN_NUM_VARS..MAX_NUM_VARS).step_by(4) {
+    for num_vars in (MIN_NUM_VARS..MAX_NUM_VARS).step_by(2) {
         println!(
             "\tnum_vars: {}, size: {} B",
             num_vars,
