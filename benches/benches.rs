@@ -63,141 +63,37 @@ type Brakedown<F> = LinearCodePCS<
     ColHasher<F>,
 >;
 
-const MIN_NUM_VARS: usize = 10;
-const MAX_NUM_VARS: usize = 20;
+const MIN_NUM_VARS: usize = 12;
+const MAX_NUM_VARS: usize = 25;
 
 /*************** Instantiating target functions ***************/
-fn hyrax_bls12_381(c: &mut Criterion) {
-    bench_pcs_method::<_, Hyrax<G1Affine381>>(
-        c,
-        (MIN_NUM_VARS..MAX_NUM_VARS).step_by(2).collect(),
-        "commit_hyrax_range_BLS12_381",
-        commit::<_, Hyrax<G1Affine381>>,
-    );
-    bench_pcs_method::<_, Hyrax<G1Affine381>>(
-        c,
-        (MIN_NUM_VARS..MAX_NUM_VARS).step_by(2).collect(),
-        "open_hyrax_range_BLS12_381",
-        open::<_, Hyrax<G1Affine381>>,
-    );
-
-    bench_pcs_method::<_, Hyrax<G1Affine381>>(
-        c,
-        (MIN_NUM_VARS..MAX_NUM_VARS).step_by(2).collect(),
-        "verify_hyrax_range_BLS12_381",
-        verify::<_, Hyrax<G1Affine381>>,
-    );
-}
 
 fn hyrax_bn254(c: &mut Criterion) {
     bench_pcs_method::<_, Hyrax<G1Affine254>>(
         c,
-        (MIN_NUM_VARS..MAX_NUM_VARS).step_by(2).collect(),
+        (MIN_NUM_VARS..MAX_NUM_VARS).step_by(4).collect(),
         "commit_hyrax_range_BN_254",
         commit::<_, Hyrax<G1Affine254>>,
     );
     bench_pcs_method::<_, Hyrax<G1Affine254>>(
         c,
-        (MIN_NUM_VARS..MAX_NUM_VARS).step_by(2).collect(),
+        (MIN_NUM_VARS..MAX_NUM_VARS).step_by(4).collect(),
         "open_hyrax_range_BN_254",
         open::<_, Hyrax<G1Affine254>>,
     );
 
     bench_pcs_method::<_, Hyrax<G1Affine254>>(
         c,
-        (MIN_NUM_VARS..MAX_NUM_VARS).step_by(2).collect(),
+        (MIN_NUM_VARS..MAX_NUM_VARS).step_by(4).collect(),
         "verify_hyrax_range_BN_254",
         verify::<_, Hyrax<G1Affine254>>,
-    );
-}
-
-fn ligero_bls12_381(c: &mut Criterion) {
-    bench_pcs_method::<_, Ligero<Fr381>>(
-        c,
-        (MIN_NUM_VARS..MAX_NUM_VARS).step_by(2).collect(),
-        "commit_ligero_range_BLS12_381",
-        commit::<_, Ligero<Fr381>>,
-    );
-    bench_pcs_method::<_, Ligero<Fr381>>(
-        c,
-        (MIN_NUM_VARS..MAX_NUM_VARS).step_by(2).collect(),
-        "open_ligero_range_BLS12_381",
-        open::<_, Ligero<Fr381>>,
-    );
-
-    bench_pcs_method::<_, Ligero<Fr381>>(
-        c,
-        (MIN_NUM_VARS..MAX_NUM_VARS).step_by(2).collect(),
-        "verify_ligero_range_BLS12_381",
-        verify::<_, Ligero<Fr381>>,
-    );
-}
-
-fn ligero_bn254(c: &mut Criterion) {
-    bench_pcs_method::<_, Ligero<Fr254>>(
-        c,
-        (MIN_NUM_VARS..MAX_NUM_VARS).step_by(2).collect(),
-        "commit_ligero_range_BN_254",
-        commit::<_, Ligero<Fr254>>,
-    );
-    bench_pcs_method::<_, Ligero<Fr254>>(
-        c,
-        (MIN_NUM_VARS..MAX_NUM_VARS).step_by(2).collect(),
-        "open_ligero_range_BN_254",
-        open::<_, Ligero<Fr254>>,
-    );
-
-    bench_pcs_method::<_, Ligero<Fr254>>(
-        c,
-        (MIN_NUM_VARS..MAX_NUM_VARS).step_by(2).collect(),
-        "verify_ligero_range_BN_254",
-        verify::<_, Ligero<Fr254>>,
-    );
-}
-
-fn brakedown_bn254(c: &mut Criterion) {
-    bench_pcs_method::<_, Brakedown<Fr254>>(
-        c,
-        (MIN_NUM_VARS..MAX_NUM_VARS).step_by(2).collect(),
-        "commit_brakedown_range_BN_254",
-        commit::<_, Brakedown<Fr254>>,
-    );
-    bench_pcs_method::<_, Brakedown<Fr254>>(
-        c,
-        (MIN_NUM_VARS..MAX_NUM_VARS).step_by(2).collect(),
-        "open_brakedown_range_BN_254",
-        open::<_, Brakedown<Fr254>>,
-    );
-
-    bench_pcs_method::<_, Brakedown<Fr254>>(
-        c,
-        (MIN_NUM_VARS..MAX_NUM_VARS).step_by(2).collect(),
-        "verify_brakedown_range_BN_254",
-        verify::<_, Brakedown<Fr254>>,
     );
 }
 
 criterion_group! {
     name = hyrax_benches;
     config = Criterion::default();
-    targets =
-        hyrax_bls12_381,
-        hyrax_bn254
+    targets = hyrax_bn254
 }
 
-criterion_group! {
-    name = ligero_benches;
-    config = Criterion::default();
-    targets =
-        ligero_bls12_381,
-        ligero_bn254
-}
-
-criterion_group! {
-    name = brakedown_benches;
-    config = Criterion::default();
-    targets =
-        brakedown_bn254,
-}
-
-criterion_main!(hyrax_benches, ligero_benches, brakedown_benches);
+criterion_main!(hyrax_benches);
