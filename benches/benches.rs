@@ -64,7 +64,7 @@ type Brakedown<F> = LinearCodePCS<
 >;
 
 const MIN_NUM_VARS: usize = 12;
-const MAX_NUM_VARS: usize = 25;
+const MAX_NUM_VARS: usize = 21;
 
 /*************** Instantiating target functions ***************/
 

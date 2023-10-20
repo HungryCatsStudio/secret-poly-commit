@@ -16,7 +16,7 @@ use ark_bn254::{Fr as Fr254, G1Affine as G1Affine254};
 use blake2::Blake2s256;
 
 const MIN_NUM_VARS: usize = 12;
-const MAX_NUM_VARS: usize = 25;
+const MAX_NUM_VARS: usize = 21;
 
 type Hyrax<G> = HyraxPC<G, DenseMultilinearExtension<<G as AffineRepr>::ScalarField>>;
 

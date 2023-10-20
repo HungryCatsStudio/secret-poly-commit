@@ -28,6 +28,8 @@ pub fn bench_pcs_method<
     method: impl Fn(&PCS::UniversalParams, usize) -> Duration,
 ) {
     let mut group = c.benchmark_group(msg);
+    group.sample_size(25);
+
     let rng = &mut test_rng();
 
     // Add for logarithmic scale (should yield linear plots)
