@@ -273,7 +273,7 @@ pub trait PolynomialCommitment<F: PrimeField, P: Polynomial<F>, S: Cryptographic
     /// same point label but different actual points.
     ///
     /// The opening challenges are independent for each batch of polynomials.
-    /// 
+    ///
     /// The default implementation achieves this by rearranging the queries in
     /// order to gather (i.e. batch) all polynomials that should be queried at
     /// the same point, then opening their commitments simultaneously with a
@@ -312,7 +312,6 @@ pub trait PolynomialCommitment<F: PrimeField, P: Polynomial<F>, S: Cryptographic
         // `point_label` is the label of the point being queried
         // `point` is the actual point
         for (label, (point_label, point)) in query_set.iter() {
-
             // For each point label in `query_set`, we define an entry in
             // `query_to_labels_map` containing a pair whose first element is
             // the actual point and the second one is the set of labels of the
@@ -330,7 +329,7 @@ pub trait PolynomialCommitment<F: PrimeField, P: Polynomial<F>, S: Cryptographic
             let mut query_comms: Vec<&'a LabeledCommitment<Self::Commitment>> = Vec::new();
 
             // Constructing matching vectors with the polynomial, commitment
-            // randomness and actual commitment for each polynomial being 
+            // randomness and actual commitment for each polynomial being
             // queried at `point`
             for label in labels {
                 let (polynomial, rand, comm) =
@@ -373,13 +372,13 @@ pub trait PolynomialCommitment<F: PrimeField, P: Polynomial<F>, S: Cryptographic
     ///
     /// Behaviour is undefined if `query_set` contains the entries with the
     /// same point label but different points.
-    /// 
+    ///
     /// Behaviour is also undefined if proofs are not ordered the same way as
     /// queries in `query_to_labels_map` (this is the outcome of calling
     /// `batch_open` for the same commitment list and query set).H
     ///
     /// The opening challenges are independent for each batch of polynomials.
-    /// 
+    ///
     /// The default implementation achieves this by rearranging the queries in
     /// order to gather (i.e. batch) the proofs of all polynomials that should
     /// have been opened at the same point, then verifying those proofs
@@ -421,7 +420,6 @@ pub trait PolynomialCommitment<F: PrimeField, P: Polynomial<F>, S: Cryptographic
         let mut result = true;
         for ((_point_label, (point, labels)), proof) in query_to_labels_map.into_iter().zip(proofs)
         {
-
             // Constructing matching vectors with the commitment and claimed
             // value of each polynomial being queried at `point`
             let mut comms: Vec<&'_ LabeledCommitment<_>> = Vec::new();
@@ -440,9 +438,9 @@ pub trait PolynomialCommitment<F: PrimeField, P: Polynomial<F>, S: Cryptographic
                 comms.push(commitment);
                 values.push(*v_i);
             }
-            
+
             let proof_time = start_timer!(|| "Checking per-query proof");
-            
+
             // Verify all proofs referring to the current point simultaneously
             // with a single call to `check`
             result &= Self::check(
@@ -461,7 +459,7 @@ pub trait PolynomialCommitment<F: PrimeField, P: Polynomial<F>, S: Cryptographic
 
     /// Open commitments to all polynomials involved in a number of linear
     /// combinations (LC) simultaneously.
-    /// 
+    ///
     /// The default implementation does so by batch-opening all polynomials
     /// appearing in those LC that are queried at the same point.
     fn open_combinations<'a>(
@@ -506,7 +504,7 @@ pub trait PolynomialCommitment<F: PrimeField, P: Polynomial<F>, S: Cryptographic
 
     /// Verify opening proofs for all polynomials involved in a number of
     /// linear combinations (LC) simultaneously.
-    /// 
+    ///
     /// The default implementation does this by batch-checking each
     /// batch-opening proof of polynomials appearing in those LC that were
     /// queried at the same point, then computing the evaluations of each LC
@@ -568,7 +566,7 @@ pub trait PolynomialCommitment<F: PrimeField, P: Polynomial<F>, S: Cryptographic
 
                     actual_rhs += &(*coeff * eval);
                 }
-                
+
                 // Checking the computed evaluation matches the claimed one
                 if claimed_rhs != actual_rhs {
                     eprintln!("Claimed evaluation of {} is incorrect", lc.label());
@@ -624,15 +622,15 @@ where
 
 // Separate the information about queries on linear combinations into
 // information about queries on individual polynomials.
-// 
+//
 // For instance, if `linear_combinations` is
 // [
-//  ("average", 1/2 * pol_1 + 1/2 * pol_2), 
+//  ("average", 1/2 * pol_1 + 1/2 * pol_2),
 //  ("weighted", 1/2 * pol_1 + 1/2 * pol_3)
 // ]
 // and `query_set` is
 // [
-//  ("average", ("three", 3)) 
+//  ("average", ("three", 3))
 //  ("weighted", ("three", 3))
 // ],
 // then the output is
