@@ -200,4 +200,12 @@ criterion_group! {
         brakedown_bn254,
 }
 
-criterion_main!(hyrax_benches, ligero_benches, brakedown_benches);
+criterion_group! {
+    name = linear_code_all;
+    config = Criterion::default();
+    targets =
+        ligero_bn254,
+        brakedown_bn254
+}
+
+criterion_main!(linear_code_all);
